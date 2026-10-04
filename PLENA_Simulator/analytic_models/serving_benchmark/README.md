@@ -1,0 +1,156 @@
+# RunPod A100 Serving Benchmark
+
+This harness measures the A100 phases needed by the disaggregated-serving
+study. It uses offline vLLM, deterministic token IDs, exact output lengths,
+NVML board-energy counters, and a simultaneous 20 Hz power trace.
+
+It does **not** import PLENA KV into vLLM. `imported_kv_decode_proxy` removes
+the measured A100 prefill phase and adds one measured normal decode iteration
+to represent the first token produced from imported KV.
+
+## RunPod sequence
+
+Use an on-demand Secure Cloud pod with 8 x A100 SXM 80 GB, an 80 GB container
+disk, and a 500 GB network volume mounted at `/workspace`. Store the checkout,
+Hugging Face cache, and all results on `/workspace`; network-volume pods must
+be terminated rather than stopped.
+
+When a large ephemeral root overlay is available but `/workspace` is small,
+use the explicit split-storage mode instead. Source and result artifacts remain
+under `/workspace`; model caches live on the disposable root overlay and must
+be downloaded again after Pod termination:
+
+```bash
+export PLENA_RUNPOD_STORAGE_MODE=ephemeral-model-cache
+export HF_HOME=/root/runpod-cache/huggingface
+export VLLM_CACHE_ROOT=/root/runpod-cache/vllm
+export RESULTS=/workspace/plena_runpod_a100_v1
+
+python -m analytic_models.serving_benchmark inventory \
+  --storage-mode ephemeral-model-cache \
+  --output "$RESULTS/inventory.json"
+```
+
+This mode requires at least 400 GB free on `/` and 10 GB free on `/workspace`.
+It never treats the ephemeral model cache as a persistent campaign artifact.
+
+```bash
+export HF_HOME=/workspace/huggingface
+export VLLM_CACHE_ROOT=/workspace/vllm-cache
+export RESULTS=/workspace/plena_runpod_a100_v1
+
+python -m pip install -r analytic_models/serving_benchmark/requirements-runpod.txt
+
+python -m analytic_models.serving_benchmark inventory \
+  --output "$RESULTS/inventory.json"
+
+python -m analytic_models.serving_benchmark preflight \
+  --inventory "$RESULTS/inventory.json" \
+  --output-root "$RESULTS/preflight" \
+  --environment-lock "$RESULTS/environment.lock.json" \
+  --image-digest 'sha256:<digest-from-RunPod-template>'
+
+python -m analytic_models.serving_benchmark run \
+  --environment-lock "$RESULTS/environment.lock.json" \
+  --image-digest 'sha256:<same-digest>' \
+  --measurement-stage screening \
+  --output-root "$RESULTS/screening"
+
+python -m analytic_models.serving_benchmark aggregate \
+  --output-root "$RESULTS/screening"
+```
+
+When the RunPod owner cannot expose the base-image digest, omit
+`--image-digest` from both `preflight` and `run`. The environment lock then
+uses a runtime fingerprint over the validated inventory, package versions,
+cache paths, and resolved checkpoint revisions. Results are marked
+`container_digest_unavailable`; this reduces provenance fidelity but does not
+change benchmark execution or measurement semantics.
+
+Screening runs all 14 primary-workload topology/local-batch points once after
+their warmup. The default `auto` scheduler shards each reusable engine group
+across the number of replicas that can physically fit: up to eight TP1, four
+TP2, two TP4, or one TP8 worker can occupy the eight-GPU node. Points assigned
+to one shard reuse its loaded model. Mixed power-of-two TP sizes are packed
+whenever their GPU sets do not overlap. Each worker gets a
+separate CUDA visibility mask and rendezvous port, while NVML/DCGM retain the
+physical GPU IDs. Capacity failures terminate only the affected point.
+
+`auto` uses sharded-engine GPU concurrency for screening, engine-group
+concurrency for the inexpensive short sweep, and isolated execution for
+confirmation and holdout measurements. This keeps candidate discovery fast
+without using co-tenant measurements as the final formal values.
+`--execution-mode gpu-parallel` forces point-level concurrency for any stage;
+`--execution-mode sequential` disables it. The available devices and process
+cap can be changed
+with:
+
+```text
+--physical-gpu-pool 0,1,2,3,4,5,6,7
+--max-concurrent-engines 8
+```
+
+Scheduler assignments and start/end timestamps are retained in
+`active_schedule.json` and `run_state.json`. Physical placement is diagnostic
+metadata and does not alter a point's resume fingerprint.
+
+Select the best topology for each declared system and confirm
+only those points (plus a runner-up when it is within 5%):
+
+```bash
+python -m analytic_models.serving_benchmark run \
+  --environment-lock "$RESULTS/environment.lock.json" \
+  --image-digest 'sha256:<same-digest>' \
+  --measurement-stage confirmation \
+  --point-ids '<comma-separated-selected-primary-points>' \
+  --output-root "$RESULTS/confirmation"
+```
+
+`confirmation`, `short-sweep`, and selected `holdout` points use three full
+measurements. `holdout` requires explicit point IDs so the 114k/5k workload is
+never accidentally run over the complete topology matrix.
+
+After the corresponding independent TP4 point is complete, run the two-replica
+check on disjoint halves of the node:
+
+```bash
+python -m analytic_models.serving_benchmark replica-check \
+  --environment-lock "$RESULTS/environment.lock.json" \
+  --image-digest 'sha256:<same-digest>' \
+  --formal-output-root "$RESULTS/confirmation" \
+  --output-root "$RESULTS/replica_checks/32b-primary-tp4-b4" \
+  --point-id qwen3-32b.primary-90000x8000.tp4.b4
+```
+
+The output reports latency and energy correction factors and flags deviations
+above 5%.
+
+Each stage must use its own output directory. `run` is resumable. A completed point is skipped only when its manifest,
+checkpoint revision, backend, and environment hashes all match. Use
+`--models`, `--workloads`, or `--point-ids` to execute a subset. Do not alter
+the image or Python environment after preflight.
+
+## Fidelity and validation
+
+- Prefix caching, speculative decoding, CPU offload, and swap are disabled.
+- Sampling is greedy with EOS ignored and an exact output-token count.
+- Phase schema `request-visible-v4` keeps request-visible TTFT, scheduler-
+  admitted TTFT, the batch first-token barrier, and the throughput-equivalent
+  interval as separate quantities. It also derives per-request TPOT from the
+  first and last output-token timestamps and retains median/P95 TBT.
+- New runs read `arrival_time`, `first_scheduled_time`, `first_token_time`, and
+  `time_in_queue` from vLLM `RequestMetrics`. Exact scheduler-admitted TTFT is
+  `first_token_time - first_scheduled_time`.
+- Legacy runs may derive an admitted-TTFT proxy only from a validated serial
+  first-token staircase. `batch barrier / batch` is always labelled as a
+  service interval, never TTFT.
+- Canonical system throughput is generated output tokens/s. Canonical energy
+  efficiency is output tokens/J; requests/s and requests/J remain auxiliary
+  aliases for fixed-output-length comparisons.
+- The first vLLM output marks each request's first-token boundary. The next
+  engine iteration is the measured normal decode-step proxy.
+- Any multi-token engine step or token-count mismatch fails the point.
+- Aggregation warns above 5% repeat CV or 3% disagreement between NVML's
+  total-energy counter and integrated 20 Hz samples.
+- RunPod-internal NVLink is only evidence for A100 TP/DP. It is not the
+  modeled PLENA-to-A100 handoff link.

@@ -1,0 +1,781 @@
+"""Shared physical layout planning for native decoder compilation.
+
+The native compiler and CostEmitter must agree on physical activation rows and
+packed-GQA columns.  Keeping that arithmetic in one module prevents a cost
+trace from silently modelling a layout that the emitted ISA cannot execute.
+"""
+
+from __future__ import annotations
+
+import math
+from dataclasses import dataclass
+
+
+NATIVE_LAYOUT_SCHEMA_VERSION = 6
+NATIVE_LAYOUT_MODES = frozenset({"compact", "legacy"})
+FP_CONSTANT_NUM_DEFAULT = 10
+SOFTMAX_STATE_SCHEDULE_STREAMED_V2 = "streamed-v2"
+SOFTMAX_STATE_SCHEDULE_SRAM_V1 = "sram-v1"
+SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3 = "row-bank-simd-v3"
+SOFTMAX_STATE_SCHEDULES = frozenset(
+    {
+        SOFTMAX_STATE_SCHEDULE_STREAMED_V2,
+        SOFTMAX_STATE_SCHEDULE_SRAM_V1,
+        SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3,
+    }
+)
+SOFTMAX_ROW_ISA_TIERS = (1, 2, 4, 8)
+SOFTMAX_ROW_MODEL_TIERS = (1, 2, 4, 8, 16)
+# Compatibility name for callers that mean executable hardware tiers.
+SOFTMAX_ROW_LANE_TIERS = SOFTMAX_ROW_ISA_TIERS
+SOFTMAX_ROW_ISSUE_SCHEDULE_GROUP_SERIAL_V1 = "group-serial-v1"
+SOFTMAX_ROW_ISSUE_SCHEDULE_WAVEFRONT_V1 = "wavefront-v1"
+SOFTMAX_ROW_ISSUE_SCHEDULES = frozenset(
+    {
+        SOFTMAX_ROW_ISSUE_SCHEDULE_GROUP_SERIAL_V1,
+        SOFTMAX_ROW_ISSUE_SCHEDULE_WAVEFRONT_V1,
+    }
+)
+SOFTMAX_VECTOR_SCHEDULE_SINGLE_ROW_V1 = "single-row-v1"
+SOFTMAX_VECTOR_SCHEDULE_MULTI_ROW_V1 = "multi-row-v1"
+SOFTMAX_VECTOR_SCHEDULES = frozenset(
+    {SOFTMAX_VECTOR_SCHEDULE_SINGLE_ROW_V1, SOFTMAX_VECTOR_SCHEDULE_MULTI_ROW_V1}
+)
+PV_ACCUMULATION_SCHEDULE_SHIFT_ADD_V1 = "shift-add-v1"
+PV_ACCUMULATION_SCHEDULE_DIRECT_PACKED_RMW_V1 = "direct-packed-rmw-v1"
+PV_ACCUMULATION_SCHEDULES = frozenset(
+    {
+        PV_ACCUMULATION_SCHEDULE_SHIFT_ADD_V1,
+        PV_ACCUMULATION_SCHEDULE_DIRECT_PACKED_RMW_V1,
+    }
+)
+PACKED_QK_SCHEDULE_BROADCAST_K_MAJOR_V1 = "broadcast-k-major-v1"
+PACKED_QK_SCHEDULE_HEAD_MAJOR_V1 = "head-major-v1"
+PACKED_QK_SCHEDULES = frozenset(
+    {
+        PACKED_QK_SCHEDULE_BROADCAST_K_MAJOR_V1,
+        PACKED_QK_SCHEDULE_HEAD_MAJOR_V1,
+    }
+)
+COMPACT_STATS_LANE_TIERS = (4, 8, 16, 32, 64)
+COMPACT_STATS_LANE_POLICY_AUTO_V1 = "auto-tiered-v1"
+COMPACT_STATS_LANE_POLICY_FIXED_16_V1 = "fixed-16-v1"
+
+
+def _ceil_to_multiple(value: int, multiple: int) -> int:
+    if value <= 0 or multiple <= 0:
+        raise ValueError(f"value and multiple must be positive, got {value}, {multiple}")
+    return ((value + multiple - 1) // multiple) * multiple
+
+
+@dataclass(frozen=True)
+class SequencePackingPlan:
+    """Map logical ``[batch, sequence]`` rows into attention tile groups.
+
+    Compact mode co-locates several short, independent sequences in one MLEN
+    row slab.  A block-diagonal score mask preserves batch isolation.  The last
+    group is completed with all-zero dummy batches, which keeps every group
+    structurally identical and therefore loopable in ISA.
+    """
+
+    mode: str
+    batch_size: int
+    seq_len: int
+    mlen: int
+    batch_pack_factor: int
+    padded_batch_size: int
+    attention_group_count: int
+    batch_slot_rows: int
+    attention_group_seq_len: int
+    rows_per_attention_group: int
+    compile_seq_rows: int
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        batch_size: int,
+        seq_len: int,
+        mlen: int,
+        mode: str = "compact",
+    ) -> "SequencePackingPlan":
+        if batch_size <= 0 or seq_len <= 0 or mlen <= 0:
+            raise ValueError(
+                "batch_size, seq_len, and mlen must be positive, got "
+                f"{batch_size}, {seq_len}, {mlen}"
+            )
+        if mode not in NATIVE_LAYOUT_MODES:
+            raise ValueError(
+                f"native layout mode must be one of {sorted(NATIVE_LAYOUT_MODES)}, got {mode!r}"
+            )
+
+        if mode == "compact" and seq_len <= mlen:
+            slot_rows = 1 << (seq_len - 1).bit_length()
+            pack_factor = max(1, min(batch_size, mlen // slot_rows))
+        else:
+            slot_rows = seq_len
+            pack_factor = 1
+        padded_batch_size = math.ceil(batch_size / pack_factor) * pack_factor
+        group_count = padded_batch_size // pack_factor
+        group_seq_len = pack_factor * slot_rows
+        rows_per_group = _ceil_to_multiple(max(mlen, group_seq_len), mlen)
+        return cls(
+            mode=mode,
+            batch_size=batch_size,
+            seq_len=seq_len,
+            mlen=mlen,
+            batch_pack_factor=pack_factor,
+            padded_batch_size=padded_batch_size,
+            attention_group_count=group_count,
+            batch_slot_rows=slot_rows,
+            attention_group_seq_len=group_seq_len,
+            rows_per_attention_group=rows_per_group,
+            compile_seq_rows=group_count * rows_per_group,
+        )
+
+    @property
+    def dummy_batch_count(self) -> int:
+        return self.padded_batch_size - self.batch_size
+
+    @property
+    def logical_active_rows(self) -> int:
+        return self.batch_size * self.seq_len
+
+    @property
+    def packed_active_rows(self) -> int:
+        return self.padded_batch_size * self.seq_len
+
+    @property
+    def row_utilization(self) -> float:
+        return self.logical_active_rows / self.compile_seq_rows
+
+    @property
+    def mask_kind(self) -> str:
+        return "block_diagonal_causal" if self.batch_pack_factor > 1 else "causal"
+
+    def physical_row(self, batch_idx: int, token_idx: int) -> int:
+        if batch_idx < 0 or batch_idx >= self.batch_size:
+            raise IndexError(f"batch_idx={batch_idx} outside [0, {self.batch_size})")
+        if token_idx < 0 or token_idx >= self.seq_len:
+            raise IndexError(f"token_idx={token_idx} outside [0, {self.seq_len})")
+        group_idx, slot_idx = divmod(batch_idx, self.batch_pack_factor)
+        return (
+            group_idx * self.rows_per_attention_group
+            + slot_idx * self.batch_slot_rows
+            + token_idx
+        )
+
+    def active_physical_rows(self) -> tuple[int, ...]:
+        return tuple(
+            self.physical_row(batch_idx, token_idx)
+            for batch_idx in range(self.batch_size)
+            for token_idx in range(self.seq_len)
+        )
+
+    def active_row_ranges(self) -> tuple[tuple[int, int], ...]:
+        """Return maximal half-open ranges containing real token rows.
+
+        Compact short-sequence layouts place all real batch slots at the
+        beginning of each attention slab, so one range covers each populated
+        slab.  Legacy and long-sequence layouts naturally reduce to one range
+        per logical batch.  Consumers must retain ``compile_seq_rows`` as the
+        column-block stride; these ranges only select rows on which arithmetic
+        is required.
+        """
+
+        ranges: list[tuple[int, int]] = []
+        remaining_batches = self.batch_size
+        for group_idx in range(self.attention_group_count):
+            real_slots = min(self.batch_pack_factor, remaining_batches)
+            if real_slots <= 0:
+                break
+            start = group_idx * self.rows_per_attention_group
+            for slot_idx in range(real_slots):
+                start = (
+                    group_idx * self.rows_per_attention_group
+                    + slot_idx * self.batch_slot_rows
+                )
+                end = start + self.seq_len
+                if ranges and ranges[-1][1] == start:
+                    ranges[-1] = (ranges[-1][0], end)
+                else:
+                    ranges.append((start, end))
+            remaining_batches -= real_slots
+        return tuple(ranges)
+
+    def metadata(self) -> dict[str, int | float | str]:
+        return {
+            "schema_version": NATIVE_LAYOUT_SCHEMA_VERSION,
+            "mode": self.mode,
+            "logical_batch_size": self.batch_size,
+            "padded_batch_size": self.padded_batch_size,
+            "dummy_batch_count": self.dummy_batch_count,
+            "seq_len": self.seq_len,
+            "batch_pack_factor": self.batch_pack_factor,
+            "batch_slot_rows": self.batch_slot_rows,
+            "attention_group_count": self.attention_group_count,
+            "attention_group_seq_len": self.attention_group_seq_len,
+            "rows_per_attention_group": self.rows_per_attention_group,
+            "logical_active_rows": self.logical_active_rows,
+            "physical_rows": self.compile_seq_rows,
+            "active_row_ranges": [list(row_range) for row_range in self.active_row_ranges()],
+            "row_utilization": self.row_utilization,
+            "mask_kind": self.mask_kind,
+        }
+
+
+@dataclass(frozen=True)
+class SoftmaxRowGroup:
+    """One bank-aligned group of independent query rows.
+
+    ``active_rows`` is the number of live lanes in the group.  A tail group
+    keeps the same hardware tier and leaves the remaining state entries
+    invalid, so the ISA never reads dummy rows as online-softmax state.
+    """
+
+    base_row: int
+    active_rows: int
+    row_lanes: int
+    segment_index: int | None
+    segment_log2: int
+    mask_geometry: str
+
+    def __post_init__(self) -> None:
+        if self.row_lanes not in SOFTMAX_ROW_MODEL_TIERS:
+            raise ValueError(f"unsupported softmax row tier {self.row_lanes}")
+        if not 1 <= self.active_rows <= self.row_lanes:
+            raise ValueError(
+                f"active_rows={self.active_rows} outside [1, {self.row_lanes}]"
+            )
+        if self.base_row < 0:
+            raise ValueError(f"base_row must be nonnegative, got {self.base_row}")
+
+    @property
+    def full(self) -> bool:
+        return self.active_rows == self.row_lanes
+
+    @property
+    def active_row_mask(self) -> int:
+        return (1 << self.active_rows) - 1
+
+    def bank_address(self, physical_row: int) -> tuple[int, int]:
+        if not self.base_row <= physical_row < self.base_row + self.active_rows:
+            raise IndexError(f"row {physical_row} is not active in {self}")
+        return physical_row % self.row_lanes, physical_row // self.row_lanes
+
+
+@dataclass(frozen=True)
+class SoftmaxRowGroupRun:
+    """A hardware-loopable run of row groups with identical geometry."""
+
+    groups: tuple[SoftmaxRowGroup, ...]
+
+    @property
+    def first(self) -> SoftmaxRowGroup:
+        return self.groups[0]
+
+    @property
+    def count(self) -> int:
+        return len(self.groups)
+
+
+@dataclass(frozen=True)
+class SoftmaxRowGroupPlan:
+    """Canonical row grouping for multi-row online softmax lowering."""
+
+    row_lanes: int
+    groups: tuple[SoftmaxRowGroup, ...]
+    score_tile_rows: int
+    score_tile_columns: int
+    scalar_fallback_rows: tuple[int, ...] = ()
+
+    @classmethod
+    def build(
+        cls,
+        *,
+        sequence: SequencePackingPlan | None,
+        rows: int,
+        mlen: int,
+        row_lanes: int,
+        valid_cols: int | None = None,
+        vlen: int | None = None,
+    ) -> "SoftmaxRowGroupPlan":
+        if row_lanes not in SOFTMAX_ROW_MODEL_TIERS:
+            raise ValueError(
+                "softmax_row_lanes must be one of "
+                f"{SOFTMAX_ROW_MODEL_TIERS}, "
+                f"got {row_lanes}"
+            )
+        if rows <= 0 or rows > mlen:
+            raise ValueError(f"rows must be in [1, {mlen}], got {rows}")
+
+        if (
+            sequence is not None
+            and sequence.mode == "compact"
+            and sequence.seq_len <= mlen
+            and rows == sequence.attention_group_seq_len
+        ):
+            slot_rows = int(sequence.batch_slot_rows)
+            ranges = tuple(
+                (slot * slot_rows, int(sequence.seq_len), slot, slot_rows)
+                for slot in range(int(sequence.batch_pack_factor))
+            )
+        else:
+            ranges = ((0, rows, None, mlen),)
+
+        groups: list[SoftmaxRowGroup] = []
+        fallback: list[int] = []
+        for start, count, segment, segment_width in ranges:
+            cursor = start
+            end = start + count
+            while cursor < end and cursor % row_lanes:
+                fallback.append(cursor)
+                cursor += 1
+            while cursor < end:
+                active = min(row_lanes, end - cursor)
+                groups.append(
+                    SoftmaxRowGroup(
+                        base_row=cursor,
+                        active_rows=active,
+                        row_lanes=row_lanes,
+                        segment_index=segment,
+                        segment_log2=int(math.log2(segment_width)),
+                        mask_geometry=(
+                            f"segment:{segment}:{segment_width}"
+                            if segment is not None
+                            else (
+                                f"valid-cols:{valid_cols}"
+                                if valid_cols is not None and valid_cols < mlen
+                                else "full-row"
+                            )
+                        ),
+                    )
+                )
+                cursor += active
+        return cls(
+            row_lanes=row_lanes,
+            groups=tuple(groups),
+            score_tile_rows=mlen,
+            score_tile_columns=int(vlen if vlen is not None else mlen),
+            scalar_fallback_rows=tuple(fallback),
+        )
+
+    @property
+    def active_rows(self) -> int:
+        return sum(group.active_rows for group in self.groups) + len(
+            self.scalar_fallback_rows
+        )
+
+    @property
+    def full_group_count(self) -> int:
+        return sum(group.full for group in self.groups)
+
+    @property
+    def tail_group_count(self) -> int:
+        return len(self.groups) - self.full_group_count
+
+    @property
+    def lane_utilization(self) -> float:
+        slots = len(self.groups) * self.row_lanes + len(self.scalar_fallback_rows)
+        return self.active_rows / slots if slots else 0.0
+
+    def affine_runs(self) -> tuple[SoftmaxRowGroupRun, ...]:
+        """Return maximal runs that share one row-group microkernel."""
+
+        runs: list[SoftmaxRowGroupRun] = []
+        current: list[SoftmaxRowGroup] = []
+        for group in self.groups:
+            if current:
+                previous = current[-1]
+                compatible = (
+                    group.active_rows == previous.active_rows
+                    and group.row_lanes == previous.row_lanes
+                    and group.mask_geometry == previous.mask_geometry
+                    and group.base_row == previous.base_row + previous.row_lanes
+                )
+                if not compatible:
+                    runs.append(SoftmaxRowGroupRun(tuple(current)))
+                    current = []
+            current.append(group)
+        if current:
+            runs.append(SoftmaxRowGroupRun(tuple(current)))
+        return tuple(runs)
+
+    def execution_runs(self) -> tuple[SoftmaxRowGroupRun, ...]:
+        """Return row-engine runs plus exact single-row alignment fallbacks."""
+
+        runs = list(self.affine_runs())
+        runs.extend(
+            SoftmaxRowGroupRun(
+                (
+                    SoftmaxRowGroup(
+                        base_row=row,
+                        active_rows=1,
+                        row_lanes=1,
+                        segment_index=None,
+                        segment_log2=0,
+                        mask_geometry="bank-alignment-single-row-fallback",
+                    ),
+                )
+            )
+            for row in self.scalar_fallback_rows
+        )
+        return tuple(sorted(runs, key=lambda run: run.first.base_row))
+
+    def metadata(self) -> dict[str, int | float | bool]:
+        return {
+            "softmax_row_lanes": self.row_lanes,
+            "softmax_score_tile_rows": self.score_tile_rows,
+            "softmax_score_tile_columns": self.score_tile_columns,
+            "softmax_rows_per_issue": self.row_lanes,
+            "softmax_score_bank_count": self.row_lanes,
+            "softmax_read_elements_per_issue": (
+                self.row_lanes * self.score_tile_columns
+            ),
+            "softmax_full_tile_unrolled": False,
+            "softmax_row_groups": len(self.groups)
+            + len(self.scalar_fallback_rows),
+            "softmax_row_lane_utilization": self.lane_utilization,
+            "softmax_full_group_count": self.full_group_count,
+            "softmax_tail_group_count": self.tail_group_count,
+            "softmax_affine_run_count": len(self.affine_runs()),
+            "bank_conflict_fallbacks": len(self.scalar_fallback_rows),
+        }
+
+
+@dataclass(frozen=True)
+class AttentionHeadPacking:
+    """Physical packed-GQA storage and execution mapping.
+
+    A logical KV/chunk group consumes only
+    ``physical_broadcast * head_slot_dim`` active columns. Compact mode places
+    several groups in one MLEN storage block. Matrix SRAM addresses are MLEN
+    aligned, so an attention operation broadcasts its one KV head across every
+    lane in that block and consumes only the score lanes assigned to the target
+    logical group. It never combines different KV heads in one operation.
+    """
+
+    enabled: bool
+    hlen: int
+    broadcast_amount: int
+    head_slot_dim: int
+    group_width: int
+    total_q_dim: int
+    active_head_dim: int | None = None
+    chunks_per_kv: int = 1
+    logical_broadcast_amount: int | None = None
+    logical_group_count: int = 1
+    attention_group_width: int | None = None
+    groups_per_storage_block: int = 1
+    storage_block_count: int = 1
+    compact: bool = False
+
+    @property
+    def heads_per_storage_block(self) -> int:
+        """Number of Q/O head slots stored in one physical MLEN block."""
+        return self.groups_per_storage_block * self.broadcast_amount
+
+    @property
+    def hardware_broadcast_amount(self) -> int:
+        """Broadcast lanes used by one attention operation.
+
+        Vector SRAM reads are VLEN-aligned, so a later group slot cannot be
+        selected through an unaligned Q base.  The current KV head is therefore
+        replicated across every stored lane and only the target group's result
+        lanes are retained.  Different KV heads are never mixed.
+        """
+        return self.heads_per_storage_block
+
+    @property
+    def head_lane_utilization(self) -> float:
+        """Fraction of allocated Q/O storage columns carrying logical heads."""
+        active = self.logical_group_count * (self.attention_group_width or self.group_width)
+        return active / self.total_q_dim
+
+    @property
+    def execution_head_lane_utilization(self) -> float:
+        """Useful lanes in an aligned storage-block broadcast operation."""
+        return self.broadcast_amount / self.hardware_broadcast_amount
+
+    def group_location(self, group_idx: int) -> tuple[int, int]:
+        if group_idx < 0 or group_idx >= self.logical_group_count:
+            raise IndexError(
+                f"group_idx={group_idx} outside [0, {self.logical_group_count})"
+            )
+        block_idx, slot_idx = divmod(group_idx, self.groups_per_storage_block)
+        slot_width = self.attention_group_width or self.group_width
+        return block_idx, slot_idx * slot_width
+
+    def group_start_col(self, group_idx: int) -> int:
+        block_idx, slot_offset = self.group_location(group_idx)
+        return block_idx * self.group_width + slot_offset
+
+    def head_start_col(self, *, kv_head: int, local_head: int) -> int:
+        if local_head < 0:
+            raise IndexError(f"local_head must be nonnegative, got {local_head}")
+        chunk, lane = divmod(local_head, self.broadcast_amount)
+        group_idx = kv_head * self.chunks_per_kv + chunk
+        return self.group_start_col(group_idx) + lane * self.head_slot_dim
+
+    def metadata(self) -> dict[str, int | float | bool | None]:
+        return {
+            "logical_broadcast_amount": self.logical_broadcast_amount,
+            "physical_broadcast_amount": self.broadcast_amount,
+            "hardware_broadcast_amount": self.hardware_broadcast_amount,
+            "stored_heads_per_block": self.heads_per_storage_block,
+            "logical_group_count": self.logical_group_count,
+            "attention_group_width": self.attention_group_width,
+            "groups_per_storage_block": self.groups_per_storage_block,
+            "storage_block_count": self.storage_block_count,
+            "storage_block_width": self.group_width,
+            "total_q_dim": self.total_q_dim,
+            "head_lane_utilization": self.head_lane_utilization,
+            "storage_head_lane_utilization": self.head_lane_utilization,
+            "execution_head_lane_utilization": self.execution_head_lane_utilization,
+            "compact": self.compact,
+        }
+
+
+@dataclass(frozen=True)
+class CompactStatsPlan:
+    """Hardware lane tier required by packed Q/K normalization."""
+
+    policy: str
+    required_segments: int
+    configured_lanes: int
+    maximum_supported_lanes: int = COMPACT_STATS_LANE_TIERS[-1]
+    fallback_reason: str | None = None
+
+    @property
+    def utilization(self) -> float:
+        return min(self.required_segments, self.configured_lanes) / self.configured_lanes
+
+    def metadata(self) -> dict[str, int | float | str | None]:
+        return {
+            "compact_stats_lane_policy": self.policy,
+            "compact_stats_required_segments": self.required_segments,
+            "compact_stats_lanes": self.configured_lanes,
+            "compact_stats_utilization": self.utilization,
+            "compact_stats_fallback_reason": self.fallback_reason,
+        }
+
+
+def build_compact_stats_plan(
+    *,
+    vlen: int,
+    hlen: int,
+    num_attention_heads: int,
+    vector_scalar_schedule: str,
+) -> CompactStatsPlan:
+    if min(vlen, hlen, num_attention_heads) <= 0:
+        raise ValueError(
+            "VLEN, HLEN, and num_attention_heads must be positive"
+        )
+    if vlen % hlen:
+        raise ValueError(f"HLEN={hlen} must divide VLEN={vlen}")
+    required = min(num_attention_heads, vlen // hlen)
+    fallback_reason = None
+    if vector_scalar_schedule in {"rtl-v5", "rtl-v6"}:
+        configured = next(
+            (
+                tier
+                for tier in COMPACT_STATS_LANE_TIERS
+                if tier >= required
+            ),
+            COMPACT_STATS_LANE_TIERS[-1],
+        )
+        if required > configured:
+            fallback_reason = "required_segments_exceed_64"
+        elif required > 32 and required < vlen // hlen:
+            fallback_reason = "partial_mask_exceeds_32_bits"
+        policy = COMPACT_STATS_LANE_POLICY_AUTO_V1
+    else:
+        configured = 16
+        if required > configured:
+            fallback_reason = "fixed_16_lane_compatibility_fallback"
+        policy = COMPACT_STATS_LANE_POLICY_FIXED_16_V1
+    return CompactStatsPlan(
+        policy=policy,
+        required_segments=required,
+        configured_lanes=configured,
+        fallback_reason=fallback_reason,
+    )
+
+
+@dataclass(frozen=True)
+class SoftmaxStateLayout:
+    """Scalar FP SRAM allocation for packed online-softmax state.
+
+    Constants always occupy the fixed prefix.  The streamed layout allocates
+    one ``m`` and one ``l`` row per simultaneously active broadcast head.  The
+    compatibility layout preserves the historical ``m/m_res/l`` allocation.
+    """
+
+    schedule: str
+    mlen: int
+    active_broadcast_heads: int
+    fp_constant_num: int
+    required_depth: int
+
+    @property
+    def storage_kind(self) -> str:
+        if self.schedule == SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3:
+            return "dedicated-softmax-state-bank"
+        return "scalar-fp-sram"
+
+    @property
+    def state_bank_entries(self) -> int:
+        if self.schedule == SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3:
+            return self.active_broadcast_heads * self.mlen
+        return 0
+
+    @property
+    def state_base(self) -> int:
+        return self.fp_constant_num
+
+    @property
+    def m_res_base(self) -> int | None:
+        if self.schedule == SOFTMAX_STATE_SCHEDULE_SRAM_V1:
+            return self.state_base + self.mlen
+        return None
+
+    def m_base(self, head: int) -> int:
+        self._validate_head(head)
+        if self.schedule == SOFTMAX_STATE_SCHEDULE_SRAM_V1:
+            return self.state_base
+        if self.schedule == SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3:
+            return head * self.mlen
+        return self.state_base + head * self.mlen
+
+    def l_base(self, head: int) -> int:
+        self._validate_head(head)
+        if self.schedule == SOFTMAX_STATE_SCHEDULE_SRAM_V1:
+            return self.state_base + 2 * self.mlen
+        if self.schedule == SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3:
+            return head * self.mlen
+        return (
+            self.state_base
+            + self.active_broadcast_heads * self.mlen
+            + head * self.mlen
+        )
+
+    def _validate_head(self, head: int) -> None:
+        if not 0 <= head < self.active_broadcast_heads:
+            raise IndexError(
+                f"softmax head={head} outside [0, {self.active_broadcast_heads})"
+            )
+
+    def metadata(self) -> dict[str, int | float | str]:
+        state_entries = (
+            self.state_bank_entries
+            if self.schedule == SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3
+            else self.required_depth - self.fp_constant_num
+        )
+        return {
+            "softmax_state_schedule": self.schedule,
+            "softmax_state_heads": self.active_broadcast_heads,
+            "softmax_state_entries_required": state_entries,
+            "softmax_state_storage": self.storage_kind,
+            "softmax_state_bank_entries": self.state_bank_entries,
+            "scalar_fp_sram_depth": self.required_depth,
+            "scalar_fp_sram_state_utilization": (
+                (
+                    0.0
+                    if self.schedule == SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3
+                    else state_entries / self.required_depth
+                )
+                if self.required_depth
+                else 0.0
+            ),
+        }
+
+
+def build_softmax_state_layout(
+    *,
+    mlen: int,
+    active_broadcast_heads: int,
+    schedule: str = SOFTMAX_STATE_SCHEDULE_STREAMED_V2,
+    fp_constant_num: int = FP_CONSTANT_NUM_DEFAULT,
+) -> SoftmaxStateLayout:
+    """Build and validate the canonical Scalar FP SRAM state allocation."""
+
+    if schedule not in SOFTMAX_STATE_SCHEDULES:
+        raise ValueError(
+            f"softmax_state_schedule must be one of "
+            f"{sorted(SOFTMAX_STATE_SCHEDULES)}, got {schedule!r}"
+        )
+    if mlen <= 0 or active_broadcast_heads <= 0 or fp_constant_num <= 0:
+        raise ValueError(
+            "mlen, active_broadcast_heads, and fp_constant_num must be positive, "
+            f"got {mlen}, {active_broadcast_heads}, {fp_constant_num}"
+        )
+    state_rows = (
+        3
+        if schedule == SOFTMAX_STATE_SCHEDULE_SRAM_V1
+        else (
+            0
+            if schedule == SOFTMAX_STATE_SCHEDULE_ROW_BANK_SIMD_V3
+            else 2 * active_broadcast_heads
+        )
+    )
+    return SoftmaxStateLayout(
+        schedule=schedule,
+        mlen=mlen,
+        active_broadcast_heads=active_broadcast_heads,
+        fp_constant_num=fp_constant_num,
+        required_depth=fp_constant_num + state_rows * mlen,
+    )
+
+
+def build_attention_head_packing(
+    *,
+    mlen: int,
+    hlen: int,
+    head_dim: int,
+    logical_broadcast_amount: int,
+    gqa_ratio: int,
+    num_kv_heads: int,
+    mode: str = "compact",
+) -> AttentionHeadPacking:
+    if mode not in NATIVE_LAYOUT_MODES:
+        raise ValueError(
+            f"native layout mode must be one of {sorted(NATIVE_LAYOUT_MODES)}, got {mode!r}"
+        )
+    values = {
+        "mlen": mlen,
+        "hlen": hlen,
+        "head_dim": head_dim,
+        "logical_broadcast_amount": logical_broadcast_amount,
+        "gqa_ratio": gqa_ratio,
+        "num_kv_heads": num_kv_heads,
+    }
+    if any(value <= 0 for value in values.values()):
+        raise ValueError(f"attention packing values must be positive, got {values}")
+    if hlen < head_dim:
+        raise ValueError(f"HLEN={hlen} is smaller than head_dim={head_dim}")
+    if mlen < hlen:
+        raise ValueError(f"MLEN={mlen} is smaller than HLEN={hlen}")
+
+    physical_broadcast = min(logical_broadcast_amount, mlen // hlen)
+    chunks_per_kv = math.ceil(gqa_ratio / physical_broadcast)
+    logical_group_count = num_kv_heads * chunks_per_kv
+    active_group_width = physical_broadcast * hlen
+    groups_per_block = mlen // active_group_width if mode == "compact" else 1
+    groups_per_block = max(1, groups_per_block)
+    storage_blocks = math.ceil(logical_group_count / groups_per_block)
+    return AttentionHeadPacking(
+        enabled=True,
+        hlen=hlen,
+        logical_broadcast_amount=logical_broadcast_amount,
+        broadcast_amount=physical_broadcast,
+        head_slot_dim=hlen,
+        group_width=mlen,
+        total_q_dim=storage_blocks * mlen,
+        active_head_dim=head_dim,
+        chunks_per_kv=chunks_per_kv,
+        logical_group_count=logical_group_count,
+        attention_group_width=active_group_width,
+        groups_per_storage_block=groups_per_block,
+        storage_block_count=storage_blocks,
+        compact=mode == "compact",
+    )

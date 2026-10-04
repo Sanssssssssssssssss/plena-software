@@ -1,9 +1,0 @@
-[submodule "PLENA"]
-	path = PLENA
-	url = https://github.com/AICrossSim/PLENA.git
-[submodule "PLENA_Doc"]
-	path = PLENA_Doc
-	url = https://github.com/AICrossSim/PLENA_Doc.git
-[submodule "PLENA-Prefill"]
-	path = PLENA-Prefill
-	url = https://github.com/AICrossSim/PLENA_Simulator.git

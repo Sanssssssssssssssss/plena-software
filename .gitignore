@@ -1,13 +1,11 @@
+/.venv*/
 /.cache/
-/.venv/
-/.venv-wsl/
-/rtl-snapshot-20260924/
-/study/logs/
-/study/runs/
+/runs/
 **/__pycache__/
 **/.pytest_cache/
 **/*.egg-info/
 **/build/
+**/target/
 **/sim_build/
 **/obj_dir/
 *.pyc
@@ -19,6 +17,5 @@
 .env
 .env.*
 !.env.example
-# Historical XML evidence retains its original directory names, including build/.
-!study/evidence/
-!study/evidence/**
+!evidence/
+!evidence/**

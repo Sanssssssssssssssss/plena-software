@@ -1,0 +1,125 @@
+[project]
+name = "plena-simulator"
+version = "1.0.0"
+description = "PLENA Simulator for LLM inference"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "torch==2.7.1+cu126",
+    "numpy",
+    "bitstring",
+    "colorlog",
+    "toml",
+    "tqdm",
+    "kernels",
+    "pytest",
+    "transformers",
+    "matplotlib",
+    "ruff>=0.12",
+    "pydantic>=2.0",
+    "tomlkit>=0.15.0",
+    "pyyaml>=6.0",
+]
+
+# Use PyTorch CUDA index only for torch packages
+[[tool.uv.index]]
+name = "pytorch-cu126"
+url = "https://download.pytorch.org/whl/cu126"
+explicit = true  # Only use this index when explicitly specified
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu126" }
+
+# =============================================================================
+# Ruff Configuration
+# =============================================================================
+[tool.ruff]
+indent-width = 4
+line-length = 120
+target-version = "py312"
+# PLENA_Compiler and PLENA_Tools are git submodules with their own linting; not part of this repo's source.
+extend-exclude = ["PLENA_Compiler", "PLENA_Tools"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "N",   # pep8-naming
+    "NPY", # numpy
+    "RUF", # ruff-specific
+]
+ignore = [
+    "E501",   # line too long (handled by formatter, not linter)
+    "I001",   # import block unsorted (too many false positives with sys.path manipulation)
+    # --- ML/math naming conventions (intentional) ---
+    "N803",   # argument name: we use M, N, K, H, W, B, K_col, etc.
+    "N806",   # variable in function: same math notation
+    "N801",   # class name: legacy Random_MXFP_Tensor_Generator-style names
+    "N802",   # function name: some intentional snake_camel mixes
+    "N812",   # lowercase imported as non-lowercase: common in ML (import torch.nn.functional as F)
+    "N816",   # mixed-case globals: fp_preload style pre-loaded config
+    "N999",   # invalid module name: PLENA_Tools is a deliberate CamelCase package, mapped in [tool.setuptools]
+    "E741",   # ambiguous single-letter: l, O, I are valid math variables
+    # --- Unicode in comments/docstrings (translation in progress) ---
+    "RUF001", # ambiguous-unicode-character-string
+    "RUF002", # ambiguous-unicode-character-docstring
+    "RUF003", # ambiguous-unicode-character-comment
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["plena_simulator"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+# =============================================================================
+# Packaging
+# =============================================================================
+# Expose PLENA_Tools/ subpackages at the top level (plena_quant, plena_utils, memory_mapping, …)
+# so `from plena_quant.quantizer... import ...` works from any cwd after `pip install -e .`.
+# compiler/* and transactional_emulator/* are namespace packages, discovered by
+# setuptools automatically once they're under the project root on sys.path.
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["PLENA_Tools", "."]
+include = [
+    "plena_quant*",
+    "quant*",
+    "plena_utils*",
+    "memory_mapping*",
+    "sim_env_utils*",
+    "verification*",
+    "compiler*",
+    "transactional_emulator*",
+    "analytic_models*",
+]
+exclude = [
+    "*tests*",
+    "*build*",
+    "*__pycache__*",
+    "*.omc*",
+]
+
+[tool.setuptools.package-dir]
+"" = "."
+plena_quant = "PLENA_Tools/plena_quant"
+quant = "PLENA_Tools/plena_quant"
+plena_utils = "PLENA_Tools/plena_utils"
+memory_mapping = "PLENA_Tools/memory_mapping"
+sim_env_utils = "PLENA_Tools/sim_env_utils"
+verification = "PLENA_Tools/verification"
+compiler = "PLENA_Compiler"
+
+# =============================================================================
+# Build System
+# =============================================================================
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

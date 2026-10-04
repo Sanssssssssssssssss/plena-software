@@ -1,0 +1,75 @@
+site_name: PLENA Documentation
+site_description: Documentation for PLENA - A Programmable Long-context Efficient Neural Accelerator
+site_author: PLENA Team
+site_url: https://AICrossSim.github.io/PLENA_Doc/
+repo_url: https://github.com/AICrossSim/PLENA_Doc
+repo_name: AICrossSim/PLENA_Doc
+
+docs_dir: doc
+site_dir: site
+use_directory_urls: false
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+    - content.code.copy
+  logo: figs/plena_logo.png
+  favicon: figs/plena_logo.png
+
+plugins:
+  - search
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Getting Started: getting-started.md
+  - Core Overview:
+      - Hardware Configuration: hardware_config.md
+      - ISA Specification: isa_spec.md
+      - Pipeline: pipeline.md
+      - Design Space: design_space.md
+  - Toolchain:
+      - Overview: toolchain_overview.md
+      - Compiler: compiler.md
+      - Accuracy Evaluator: accuracy_evaluator.md
+      - Transactional Emulator: transactional_emulator.md
+      - Analytic Model: analytic_model.md
+      - Co-Design Toolchain: co_design.md
+  - Tutorials:
+      - Overview: tutorials/index.md
+      - "Tutorial 1 — Transactional Emulator": tutorials/transactional_emulator.md
+      - "Tutorial 2 — Analytic Model": tutorials/analytic_model.md
+      - "Tutorial 3 — RTL Simulation": tutorials/rtl_simulation.md
+  - Related Projects: related_projects.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/AICrossSim/PLENA_Doc

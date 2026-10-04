@@ -1,0 +1,67 @@
+[project]
+name = "quant_eval"
+version = "0.1.0"
+requires-python = ">=3.11.9"
+dependencies = [
+    "torch>=2.6",
+    "torchvision",
+    "transformers>=4.55",
+    "lm-eval>=0.4",
+    "datasets",
+    "accelerate",
+    "colorlog",
+    "tqdm",
+    "jsonargparse",
+    "mase[mx-ptq]",
+]
+
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6",
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.25",
+    "mkdocs-jupyter>=0.25",
+]
+evalplus = [
+    "evalplus",
+    "stop-sequencer",
+]
+serve = [
+    "fastapi",
+    "uvicorn",
+]
+bfcl = [
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "beautifulsoup4",
+    "markdownify",
+    "ddgs",
+    "bfcl-eval",
+]
+dse = [
+    "botorch>=0.11",
+    "gpytorch>=1.11",
+    # plena-simulator imported in-process via sys.path injection
+    # (upstream has broken git submodules — cannot pip-install yet).
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+mase = { git = "https://github.com/DeepWok/mase.git", branch = "yx/qwen3-moe-gptq" }
+
+[tool.uv]
+no-build-isolation-package = ["fast-hadamard-transform"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["quant_eval"]

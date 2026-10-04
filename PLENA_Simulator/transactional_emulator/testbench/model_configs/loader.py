@@ -1,0 +1,305 @@
+"""Model-aware YAML config loader with hardware assertions.
+
+Loads per-model YAML configurations and auto-detects model architectures
+from HuggingFace configs. Validates hardware constraints (hlen >= head_dim,
+broadcast >= GQA ratio, hlen <= MLEN).
+"""
+
+from __future__ import annotations
+
+import yaml
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+
+_CONFIG_DIR = Path(__file__).parent
+
+
+# ---------------------------------------------------------------------------
+# Model config dataclass
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ModelArchConfig:
+    hidden_size: int
+    inter_dim: int
+    num_heads: int
+    num_kv_heads: int
+    head_dim: int
+    num_layers: int
+    rope_theta: float
+    rms_norm_eps: float
+    vocab_size: int | None = None
+    model_type: str = "llama"
+
+    @property
+    def gqa_ratio(self) -> int:
+        return self.num_heads // self.num_kv_heads
+
+    @classmethod
+    def from_hf_config(cls, hf_config: Any) -> ModelArchConfig:
+        """Extract architecture config from a HuggingFace model config."""
+        # VLMs wrap their text model under text_config
+        cfg = getattr(hf_config, "text_config", hf_config)
+        hidden = cfg.hidden_size
+        heads = cfg.num_attention_heads
+
+        inter = getattr(cfg, "intermediate_size", None)
+        if inter is None:
+            inter = getattr(cfg, "mlp_hidden_size", None)
+        if inter is None:
+            inter = 4 * hidden
+
+        kv_heads = getattr(cfg, "num_key_value_heads", None)
+        if kv_heads is None:
+            kv_heads = getattr(cfg, "n_kv_heads", heads)
+
+        return cls(
+            hidden_size=hidden,
+            inter_dim=inter,
+            num_heads=heads,
+            num_kv_heads=kv_heads,
+            head_dim=int(getattr(cfg, "head_dim", hidden // heads)),
+            num_layers=getattr(cfg, "num_hidden_layers", getattr(cfg, "n_layers", 0)),
+            rope_theta=getattr(cfg, "rope_theta", 10000.0),
+            rms_norm_eps=getattr(cfg, "rms_norm_eps", 1e-5),
+            vocab_size=getattr(cfg, "vocab_size", None),
+            model_type=getattr(cfg, "model_type", "unknown"),
+        )
+
+
+@dataclass
+class HardwarePreset:
+    mlen: int = 64
+    vlen: int = 64
+    blen: int = 4
+    batch_size: int = 1
+    hlen: int = 64
+    broadcast: int = 1
+    mram_tile_capacity: int = 4
+    mode: str = "native"
+
+
+@dataclass
+class ModelConfig:
+    model_id: str
+    nickname: str
+    trust_remote_code: bool
+    family: str
+    arch: ModelArchConfig
+    hardware: HardwarePreset
+    hardware_presets: dict[str, HardwarePreset] = field(default_factory=dict)
+    raw: dict = field(default_factory=dict, repr=False)
+
+    def get_preset(self, name: str) -> HardwarePreset:
+        if name not in self.hardware_presets:
+            raise KeyError(f"Unknown hardware preset '{name}'. Available: {list(self.hardware_presets)}")
+        return self.hardware_presets[name]
+
+
+# ---------------------------------------------------------------------------
+# Known models registry
+# ---------------------------------------------------------------------------
+
+KNOWN_MODELS = {
+    "smolvlm2_256m": "smolvlm2_256m.yaml",  # text decoder (default)
+    "smolvlm2_256m_text": "smolvlm2_256m_text.yaml",
+    "smollm2_135m": "smollm2_135m.yaml",
+    "llada_8b": "llada_8b.yaml",  # Instruct (default)
+    "llada_8b_instruct": "llada_8b_instruct.yaml",
+    "llada_8b_base": "llada_8b_base.yaml",
+    "clm_60m": "clm_60m.yaml",
+    "qwen3_8b": "qwen3_8b.yaml",
+}
+
+
+def load_model_config(model_key: str, model_id_override: str | None = None) -> ModelConfig:
+    """Load a known model config by key (e.g. 'llada_8b')."""
+    if model_key not in KNOWN_MODELS:
+        raise KeyError(f"Unknown model key '{model_key}'. Known: {list(KNOWN_MODELS)}")
+    path = _CONFIG_DIR / KNOWN_MODELS[model_key]
+    with open(path) as f:
+        raw = yaml.safe_load(f)
+
+    if model_id_override:
+        raw["model_id"] = model_id_override
+
+    presets = {}
+    for name, preset_raw in raw.get("hardware_presets", {}).items():
+        presets[name] = HardwarePreset(**preset_raw)
+
+    return ModelConfig(
+        model_id=raw["model_id"],
+        nickname=raw.get("nickname", model_key),
+        trust_remote_code=raw.get("trust_remote_code", False),
+        family=raw["family"],
+        arch=ModelArchConfig(**raw["architecture"]["text"]),
+        hardware=HardwarePreset(**raw["hardware"]),
+        hardware_presets=presets,
+        raw=raw,
+    )
+
+
+def validate_hardware(arch: ModelArchConfig, hw: HardwarePreset, mlen: int) -> list[str]:
+    """Validate hardware config against architecture. Returns list of issues."""
+    issues = []
+
+    if hw.hlen < arch.head_dim:
+        issues.append(f"hlen={hw.hlen} < head_dim={arch.head_dim}: head slots too small for attention heads")
+
+    if hw.hlen > mlen:
+        issues.append(f"hlen={hw.hlen} > MLEN={mlen}: one attention head slot cannot fit in a matrix row")
+
+    if hw.broadcast < arch.gqa_ratio:
+        issues.append(
+            f"broadcast={hw.broadcast} < GQA ratio={arch.gqa_ratio}: "
+            f"insufficient broadcast for {arch.num_heads}/{arch.num_kv_heads} heads"
+        )
+
+    return issues
+
+
+def validate_hardware_constraints(
+    arch: ModelArchConfig,
+    hw: HardwarePreset,
+    *,
+    matrix_sram_depth: int,
+    vector_sram_depth: int,
+    int_sram_depth: int | None = None,
+    fp_sram_depth: int | None = None,
+    fp_constant_num: int = 0,
+    packed_qk_schedule: str = "head-major-v1",
+    physical_broadcast: int | None = None,
+) -> list[str]:
+    """Validate tile, SRAM, head-packing, and GQA constraints for a preset."""
+    issues = []
+
+    if hw.mlen < hw.blen:
+        issues.append(f"MLEN={hw.mlen} < BLEN={hw.blen}: matrix tile must be at least the block tile")
+
+    if hw.mlen % hw.blen != 0:
+        issues.append(f"MLEN={hw.mlen} is not divisible by BLEN={hw.blen}")
+
+    if matrix_sram_depth < 2 * hw.mlen:
+        issues.append(
+            f"MATRIX_SRAM_DEPTH={matrix_sram_depth} < 2*MLEN={2 * hw.mlen}: "
+            "matrix SRAM cannot accommodate two MLEN tiles"
+        )
+
+    hidden_rows = (arch.hidden_size + hw.vlen - 1) // hw.vlen
+    min_vector_depth = 2 * arch.head_dim + hidden_rows
+    if vector_sram_depth < min_vector_depth:
+        issues.append(
+            f"VECTOR_SRAM_DEPTH={vector_sram_depth} < 2*HEAD_DIM + ceil(HIDDEN_DIM/VLEN) = "
+            f"2*{arch.head_dim} + {hidden_rows} = {min_vector_depth}"
+        )
+
+    issues.extend(validate_hardware(arch, hw, hw.mlen))
+
+    if int_sram_depth is not None and int_sram_depth < 16:
+        issues.append(f"INT_SRAM_DEPTH={int_sram_depth} < 16")
+
+    if fp_sram_depth is not None:
+        if packed_qk_schedule == "broadcast-k-major-v1":
+            active_heads = (
+                min(hw.broadcast, hw.mlen // hw.hlen, arch.gqa_ratio)
+                if physical_broadcast is None
+                else physical_broadcast
+            )
+            min_fp_depth = fp_constant_num + 2 * hw.mlen * active_heads
+            requirement = (
+                "FP_CONSTANT_NUM + 2*MLEN*physical_broadcast = "
+                f"{fp_constant_num} + 2*{hw.mlen}*{active_heads}"
+            )
+        elif packed_qk_schedule == "head-major-v1":
+            min_fp_depth = 3 * hw.mlen + fp_constant_num
+            requirement = (
+                "3*MLEN + FP_CONSTANT_NUM = "
+                f"3*{hw.mlen} + {fp_constant_num}"
+            )
+        else:
+            issues.append(
+                f"unsupported packed_qk_schedule={packed_qk_schedule!r}"
+            )
+            return issues
+        if fp_sram_depth < min_fp_depth:
+            issues.append(
+                f"FP_SRAM_DEPTH={fp_sram_depth} < {requirement} = "
+                f"{min_fp_depth}"
+            )
+    return issues
+
+
+def resolve_hardware(
+    arch: ModelArchConfig,
+    mlen: int,
+    vlen: int | None = None,
+    blen: int | None = None,
+    batch_size: int = 1,
+    mram_tile_capacity: int = 16,
+    mode: str = "native",
+) -> HardwarePreset:
+    """Auto-compute valid hardware config given architecture and MLEN.
+
+    Rules:
+      - hlen >= head_dim
+      - hlen <= MLEN
+      - broadcast >= GQA ratio
+    """
+    gqa = arch.gqa_ratio
+
+    if mlen >= arch.head_dim:
+        return HardwarePreset(
+            mlen=mlen,
+            vlen=vlen if vlen is not None else mlen,
+            blen=blen if blen is not None else 4,
+            batch_size=batch_size,
+            hlen=arch.head_dim,
+            broadcast=gqa,
+            mram_tile_capacity=mram_tile_capacity,
+            mode=mode,
+        )
+
+    return HardwarePreset(
+        mlen=mlen,
+        vlen=vlen if vlen is not None else mlen,
+        blen=blen if blen is not None else 4,
+        batch_size=batch_size,
+        hlen=arch.head_dim,
+        broadcast=gqa,
+        mram_tile_capacity=mram_tile_capacity,
+        mode=mode,
+    )
+
+
+_NICKNAME_MAP: dict[str, str] = {}
+
+
+def _ensure_nickname_map() -> None:
+    if _NICKNAME_MAP:
+        return
+    for key, filename in KNOWN_MODELS.items():
+        path = _CONFIG_DIR / filename
+        with open(path) as f:
+            raw = yaml.safe_load(f)
+        nick = raw.get("nickname")
+        if nick and nick not in _NICKNAME_MAP:
+            _NICKNAME_MAP[nick] = key
+
+
+def load_model_config_by_nickname(nickname: str, model_id_override: str | None = None) -> ModelConfig:
+    """Load a model config by its nickname (e.g. 'smollm2', 'llada-8b')."""
+    _ensure_nickname_map()
+    if nickname not in _NICKNAME_MAP:
+        raise KeyError(f"Unknown nickname '{nickname}'. Known: {list(_NICKNAME_MAP)}")
+    return load_model_config(_NICKNAME_MAP[nickname], model_id_override)
+
+
+def arch_from_hf(model_id: str, trust_remote_code: bool = False) -> ModelArchConfig:
+    """Probe HuggingFace model config and extract architecture (no weight download)."""
+    from transformers import AutoConfig
+
+    cfg = AutoConfig.from_pretrained(model_id, trust_remote_code=trust_remote_code)
+    return ModelArchConfig.from_hf_config(cfg)

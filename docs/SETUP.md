@@ -1,67 +1,38 @@
-# 克隆与运行
+# 软件环境与完整研究入口
 
-使用 Python 3.12。基础实验只需要 CPU；完整模型准确率、DC 综合和 A100 测量不包含在快速入口中。
+日常 CPU 检查使用根目录 `requirements-cpu.txt` 和 `scripts/run_cpu.py`，Windows/Linux 均按自己的 Python 路径运行。入口把 `scripts`（旧 quant 包名别名）、Simulator、Compiler、Tools 加入 PYTHONPATH，环境不依赖归档工作区。
 
-**获取源码**
+## 事务级模拟器
 
-```sh
-git clone https://github.com/Sanssssssssssssssss/plena-prefill-lab.git
-cd plena-prefill-lab
-python study/bootstrap.py
-python study/bootstrap.py --check
+完整 Rust 工程在 `PLENA_Simulator/transactional_emulator/`，保留 Cargo 清单、测试平台、原 Docker/Nix 配置。需要 Rust/Cargo、just 和对应 Python 依赖：
+
+```bash
+cd PLENA_Simulator
+just docker-dev
+# 容器中按上游 justfile:
+just test-aten-linear
+# 或生成并运行既有工作负载：just build-emulator <testbench-name>
 ```
 
-bootstrap 获取固定的主仓库、文档、Prefill 分支和 CPU/RTL 所需子模块。Tools 使用可获得的 `0f103539` 代替不可获得的 `a359963…`；研究目录因此与原 Tools gitlink 有已说明的差异。不要用递归更新覆盖这个替代。
+直接构建入口为 `cargo build --release --manifest-path PLENA_Simulator/transactional_emulator/Cargo.toml`。原 Docker/Nix 配置完整保留，但本轮未构建容器或运行事务级模拟器；缺失 Tools pin 仍需留意。详见 [原模拟器 README](../PLENA_Simulator/README.md) 和 [justfile](../PLENA_Simulator/justfile)。
 
-**Windows CPU**
+## 量化与 BFCL
 
-```powershell
-python -m venv .venv
-.venv\Scripts\python.exe -m pip install -r requirements.txt
-.venv\Scripts\python.exe study/run_cpu.py
-.\study\run_prefill_checks.ps1
-.venv\Scripts\python.exe study/trace_experiment.py
-.venv\Scripts\python.exe study/audit_evidence.py
+`PLENA_Software` 是独立软件项目，保留 `pyproject.toml`、`uv.lock`、`calib`、`quant_eval`、`prefill_DSE`、测试和内嵌 OSWorld。不要把根目录 CPU smoke 环境当作其完整 CUDA 环境。
+
+在有匹配 CUDA/PyTorch 的机器上按 [软件原 README](../PLENA_Software/README.md) 与 [getting-started](../PLENA_Software/docs/getting-started.md) 建独立环境：
+
+```bash
+cd PLENA_Software
+uv sync
+source env.local.sh
+python prefill_DSE/run_prefill_dse.py --help
 ```
 
-**Linux CPU**
+GPU 原栈包含 MASE、CUDA PyTorch 与 fast-hadamard-transform；安装也可能需要编译工具和模型访问。这里仅保留入口，本轮未运行此安装和评测。
 
-```sh
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python study/run_cpu.py
-PYTHONPATH="lab/python-aliases:PLENA-Prefill:PLENA-Prefill/PLENA_Tools:PLENA-Prefill/PLENA_Compiler" .venv/bin/python -m pytest PLENA-Prefill/PLENA_Compiler/aten/tests/test_cost_frontend.py::test_rtl_v6_multirow_state_and_direct_pv_lowering PLENA-Prefill/analytic_models/serving_benchmark/test_serving_benchmark.py::test_system_metrics_separate_throughput_from_slo_goodput PLENA-Prefill/analytic_models/serving_benchmark/test_serving_benchmark.py::test_disaggregated_pipeline_charges_cross_stage_idle_static_energy -q
-.venv/bin/python study/trace_experiment.py
-.venv/bin/python study/audit_evidence.py
-```
+`prefill_DSE/search_space_qwen3.yaml` 是代码默认引用但未随研究 commit 提供的文件；必须取回原配置或显式传入自己的配置。没有伪造“原始配置”。研究 Workspace 另有模型 JSON、trial 基础配置及最终结果缺失，见 [结果核对](RESULTS.md)。已有 `plena_settings.toml` 不能自动替代所有历史试验配置。
 
-入口设置局部 PYTHONPATH，无需 editable 安装。`lab/python-aliases/quant` 只修复旧导入名，未证明替代 Tools 与原版数值等价。
+## 产物边界
 
-**RTL：Linux 或 WSL Ubuntu**
-
-需要 g++、make、Perl 与 Linux Python。WSL 和 Windows 的 venv 分开：
-
-```sh
-# 在 WSL 中进入克隆目录。
-python3.12 -m venv .venv-wsl
-.venv-wsl/bin/python -m pip install -r requirements.txt
-.venv-wsl/bin/python -m pip install verilator==5.34.0
-bash study/run_rtl.sh
-```
-
-原生 Linux 可在已有 `.venv` 安装同版本 Verilator 后运行。脚本识别两种环境，补齐 wheel 的 GCC PCH 参数，限制 4 个编译任务，关闭波形，并检查本次生成的 XML。
-
-PowerShell 可转换实际工作路径：
-
-```powershell
-$linuxRepo = (wsl -d Ubuntu -- wslpath -a (Get-Location).Path).Trim()
-wsl -d Ubuntu -- bash "$linuxRepo/study/run_rtl.sh"
-```
-
-**输出与验证范围**
-
-`study/logs` 和 `study/runs/linear` 保存新实验输出，被 Git 忽略。固定历史记录在 [study/evidence/2026-10-04](../study/evidence/2026-10-04)，附有来源哈希和机器路径替换说明。
-
-`run_cpu.py` 暂时修改并最终还原上游 configuration.svh 的 instruction offset；不要并行修改同一配置。旧 Qwen 解析 smoke 的 head_dim 推导存在限制，不能用于性能结论。R4 模块仿真也不等于 full-core 验收。
-
-完整复现缺失项见[证据核对](../study/02_numbers_and_evidence.md)，资源估算见[预算](../study/03_local_runs_and_budget.md)。
+根目录 smoke 写 `runs/`；量化和 Workspace 脚本有各自输出路径，启动前读参数并固定实验目录。模型、虚拟环境、缓存和大型构建产物均不应提交。新配置必须另起实验名，并标注为新示例/新实验。

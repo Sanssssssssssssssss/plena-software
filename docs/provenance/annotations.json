@@ -1,0 +1,37 @@
+[
+  {
+    "path": "PLENA_Simulator/PLENA_Compiler/aten/plena/program_attention.py",
+    "notes": 7,
+    "original_slice_sha256": "e781b68cc70292dac3e32b7247da917b2afe3fe56dec3e3c918ffe480393e983"
+  },
+  {
+    "path": "PLENA_Simulator/PLENA_Compiler/aten/cost_emitter.py",
+    "notes": 6,
+    "original_slice_sha256": "bd346a56372a2305c989de68ede758265e9b7094a1dfbb9c824659a77aff2fcd"
+  },
+  {
+    "path": "PLENA_Simulator/analytic_models/serving_benchmark/system_metrics.py",
+    "notes": 7,
+    "original_slice_sha256": "a09013794e6e846aa502ec8d0dfe4ee532eedd3fdd7f778fb3cbb29e42b03c72"
+  },
+  {
+    "path": "PLENA_Simulator/analytic_models/power/system_power.py",
+    "notes": 6,
+    "original_slice_sha256": "e7cf7c485b0bc6a05df294b9633fb8428dc098ae018cf51b7826e2449effca72"
+  },
+  {
+    "path": "PLENA_Simulator/analytic_models/dse/objective.py",
+    "notes": 5,
+    "original_slice_sha256": "5d2fd1cf58f6bca291206a7a1a787d4fff7c6d9271bd55e47bb7195868102325"
+  },
+  {
+    "path": "PLENA_Simulator/PLENA_Compiler/aten/agu.py",
+    "notes": 6,
+    "original_slice_sha256": "8279ff668d6996d3e0d7396a4184f0b15dfc649443130033020e28ea10d701ee"
+  },
+  {
+    "path": "PLENA_Simulator/PLENA_Compiler/aten/moe.py",
+    "notes": 6,
+    "original_slice_sha256": "5f9df91c6aecfcf25ddec9f8367c435beb608119b4c4492d831ddd5a2a1089a3"
+  }
+]
