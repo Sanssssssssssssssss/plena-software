@@ -1,0 +1,7 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1791109691" />
+    <testcase name="first_block_state_tail_and_final_factor_flow_through_row_engine" classname="softmax_row_engine_tb" file="${WORKSPACE}/lab/rtl-prefill/src/vector_machine/test/softmax_row_engine_tb.py" lineno="112" time="0.05695390701293945" sim_time_ns="1801.001" ratio_time="31622.079931949665" />
+    <testcase name="independent_reduction_groups_issue_on_consecutive_cycles" classname="softmax_row_engine_tb" file="${WORKSPACE}/lab/rtl-prefill/src/vector_machine/test/softmax_row_engine_tb.py" lineno="185" time="0.005582094192504883" sim_time_ns="161.00099999999998" ratio_time="28842.401157647455" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,7 @@
+${WORKSPACE}\study\online_attention_lab.py:1: SyntaxWarning: invalid escape sequence '\S'
+  """第一课：GQA 的完整 attention 与分块 online softmax，CPU 可直接运行。
+tile= 1, max_abs_error=6.661e-16, PASS
+tile= 4, max_abs_error=8.882e-16, PASS
+tile= 8, max_abs_error=7.772e-16, PASS
+tile=16, max_abs_error=6.661e-16, PASS
+tile=33, max_abs_error=7.772e-16, PASS

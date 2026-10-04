@@ -1,0 +1,11 @@
+{
+  "status": "pass",
+  "seconds": {
+    "online_attention": 1.7605677999090403,
+    "compiler": 0.14054340007714927,
+    "linear_generation": 2.0532844001427293,
+    "legacy_analytic": 0.2636943000834435
+  },
+  "machine_code_words": 158,
+  "scope": "CPU smoke; generated reference is not RTL verification; legacy estimator is not the prefill research model"
+}

@@ -1,0 +1,296 @@
+{
+  "generated_utc": "2026-10-04T10:18:21.745135+00:00",
+  "repository_commits": {
+    "PLENA": "5b06df9ab13840b8834766311313e2d27bfbebed",
+    "PLENA_Doc": "7bf6d7636a3298159686773f4343cb7d7d743f17",
+    "PLENA/PLENA_RTL": "783ee48ea81607308aba40a7dfe83b52868d1b71",
+    "PLENA/PLENA_Simulator": "a4b3e7deb8dd78c1950922ea89085b819cf5a9de",
+    "PLENA/PLENA_Software": "6c9f99352513f11798ef700604b5022fe4911f60",
+    "PLENA-Prefill": "fddfcb9a7c3eaa1ad9f1c24da829a4422b324650",
+    "PLENA-Prefill/PLENA_Compiler": "0ba3b657725bf083feec06c8e356e2d6235cd4d5",
+    "PLENA-Prefill/PLENA_Tools": "0f10353947eb442c73f27f4ed30925f3e83e73a1",
+    "rtl-snapshot-20260924/PLENA_RTL": "1e0eb060118669afbb8d03b100d1bdbd30c76cdd",
+    "rtl-snapshot-20260924/PLENA_RTL/PLENA_Compiler": "17b2bd098570ae85a652e0c911bd4fbca534bea7",
+    "rtl-snapshot-20260924/PLENA_RTL/PLENA_Tools": "af11f546094f0c3d8a158913cbd95d4da8349ee2"
+  },
+  "research_tools_requested": "a359963dec3cd0443051cacf063316684f96fa27",
+  "research_tools_status": "requested commit unavailable; substituted 0f103539, quant namespace alias used for focused checks",
+  "archive_sha256": "979103A40F877590A4A8213F35DA4E3269CB889BF3E10E850BF5ED2B57026CC8",
+  "expected_artifacts": {
+    "Workspace/qwen3_32b_dense_analytic/qwen3-32b.json": false,
+    "Workspace/qwen3_235b_a22b_analytic/qwen3-235b-a22b-instruct.json": false,
+    "Workspace/qwen3_32b_transactional_prefetch_sweep/runs/gqa_logical_kv_optimized_20260710/trial_0000/plena_settings.toml": false,
+    "Workspace/qwen3_32b_dense_analytic/runs/disaggregate_prefill_dse_config_v1": false,
+    "Workspace/measurements/runpod_a100/plena_runpod_a100_v1/formal_v2": false,
+    "Workspace/reports/serving/primary_90k8_system_search_v3.md": false,
+    "Workspace/reports/serving/primary_90k8_system_search_v5_results.json": false
+  },
+  "historical_rtl_xml": [
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_adder/test_0/results.xml",
+      "tests": 1,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_cp_adder/test_0/results.xml",
+      "tests": 1,
+      "failures": [
+        "test"
+      ]
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_cp_asym_mult/test_0/results.xml",
+      "tests": 1,
+      "failures": [
+        "test"
+      ]
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_cp_exp/test_0/results.xml",
+      "tests": 1,
+      "failures": [
+        "test_fp_cp_exp"
+      ]
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_ieee_casting/test_0/results.xml",
+      "tests": 1,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_ieee_partition/test_0/results.xml",
+      "tests": 1,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_mult/test_0/results.xml",
+      "tests": 1,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/basic_components/fp_operation/test/build/fp_mult/test_1/results.xml",
+      "tests": 1,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/frontend/test/build/decoder_tb_wrapper/test_0/results.xml",
+      "tests": 4,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/matrix_machine/test/build/packed_pv_writeback/test_0/results.xml",
+      "tests": 1,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/memory/vector_sram/test/build/fp_vector_sram/test_0/results.xml",
+      "tests": 1,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/system/test/results.xml",
+      "tests": 1,
+      "failures": [
+        "test"
+      ]
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/vector_machine/test/build/softmax_row_engine_test_wrapper/test_0/results.xml",
+      "tests": 2,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/vector_machine/test/build/vector_machine_rtl_v6_integration_wrapper/test_0/results.xml",
+      "tests": 3,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/vector_machine/test/build/vector_machine_rtl_v6_integration_wrapper/test_1/results.xml",
+      "tests": 3,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/vector_machine/test/build/vector_machine_rtl_v6_integration_wrapper/test_2/results.xml",
+      "tests": 3,
+      "failures": []
+    },
+    {
+      "path": "rtl-snapshot-20260924/PLENA_RTL/src/vector_machine/test/build/vector_machine_rtl_v6_integration_wrapper/test_3/results.xml",
+      "tests": 3,
+      "failures": []
+    }
+  ],
+  "historical_rtl_summary": {
+    "files": 17,
+    "tests": 29,
+    "failures": 4
+  },
+  "accuracy235_csv_rows": 63,
+  "accuracy235_w4a4kv4": [
+    {
+      "trial_id": "w-MXINT_4__act-MXINT_4__kv-MXINT_4__fp-FP_E6M5__cfae2c7b",
+      "weight_precision": "MXINT_4",
+      "act": "MXINT_4",
+      "kv": "MXINT_4",
+      "fp_setting": "FP_E6M5",
+      "accuracy": "0.96",
+      "correct": "48",
+      "total": "50",
+      "runtime_sec": "577.80",
+      "log_dir": "${UPSTREAM_WORKSPACE}/PLENA_Software/prefill_DSE/runs/qwen3_235b_w4_gpu_dual_bs25_gpus2to7/trials/w-MXINT_4__act-MXINT_4__kv-MXINT_4__fp-FP_E6M5__cfae2c7b"
+    },
+    {
+      "trial_id": "w-MXINT_4__act-MXINT_4__kv-MXINT_4__fp-FP_E8M5__dbb3167d",
+      "weight_precision": "MXINT_4",
+      "act": "MXINT_4",
+      "kv": "MXINT_4",
+      "fp_setting": "FP_E8M5",
+      "accuracy": "0.96",
+      "correct": "48",
+      "total": "50",
+      "runtime_sec": "577.80",
+      "log_dir": "${UPSTREAM_WORKSPACE}/PLENA_Software/prefill_DSE/runs/qwen3_235b_w4_gpu_dual_bs25_gpus2to7/trials/w-MXINT_4__act-MXINT_4__kv-MXINT_4__fp-FP_E8M5__dbb3167d"
+    },
+    {
+      "trial_id": "w-MXINT_4__act-MXINT_4__kv-MXINT_4__fp-FP_E5M6__e1c02db0",
+      "weight_precision": "MXINT_4",
+      "act": "MXINT_4",
+      "kv": "MXINT_4",
+      "fp_setting": "FP_E5M6",
+      "accuracy": "0.92",
+      "correct": "46",
+      "total": "50",
+      "runtime_sec": "577.80",
+      "log_dir": "${UPSTREAM_WORKSPACE}/PLENA_Software/prefill_DSE/runs/qwen3_235b_w4_gpu_dual_bs25_gpus2to7/trials/w-MXINT_4__act-MXINT_4__kv-MXINT_4__fp-FP_E5M6__e1c02db0"
+    }
+  ],
+  "accuracy32_w4a4kv4": [
+    {
+      "name": "w_mxint4__act_mxint4__kv_mxint4__fp_e5m6",
+      "accuracy_score": 0.98,
+      "ACT_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "KV_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "WEIGHT_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "FP_SETTING": {
+        "exp": 5,
+        "mant": 6
+      }
+    },
+    {
+      "name": "w_mxint4__act_mxint4__kv_mxint4__fp_e6m5",
+      "accuracy_score": 0.92,
+      "ACT_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "KV_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "WEIGHT_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "FP_SETTING": {
+        "exp": 6,
+        "mant": 5
+      }
+    },
+    {
+      "name": "w_mxint4__act_mxint4__kv_mxint4__fp_e8m5",
+      "accuracy_score": 0.92,
+      "ACT_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "KV_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "WEIGHT_WIDTH": {
+        "kind": "MXINT",
+        "width": 4,
+        "scale_width": 8
+      },
+      "FP_SETTING": {
+        "exp": 8,
+        "mant": 5
+      }
+    }
+  ],
+  "historical_table_recalculation": {
+    "dense_single_layer_speedup": 2.687114558986263,
+    "moe_single_layer_speedup": 3.2192157516868076,
+    "completed_dse_trials": 81920,
+    "attempted_dse_trials": 191886,
+    "dense_output_tps_percent": 5.292441912222912,
+    "moe_output_tps_percent": 13.25420543628326,
+    "dense_output_tokens_per_j_percent": 47.47958448420802,
+    "moe_output_tokens_per_j_percent": 67.53824706891622
+  },
+  "ideal_storage_estimate_B8_S98000_decimal_GB": {
+    "32B": {
+      "weights_4bit_GB": 16.0,
+      "weights_16bit_GB": 64.0,
+      "kv4_GB": 51.380224,
+      "kv16_GB": 205.520896,
+      "weights_plus_kv4_GB": 67.380224
+    },
+    "235B": {
+      "weights_4bit_GB": 117.5,
+      "weights_16bit_GB": 470.0,
+      "kv4_GB": 37.732352,
+      "kv16_GB": 150.929408,
+      "weights_plus_kv4_GB": 155.232352
+    }
+  },
+  "dse_ideal_hours_excluding_pruned_and_overhead": [
+    {
+      "seconds_per_completed_trial": 1,
+      "effective_parallelism": 4,
+      "hours": 5.688888888888889
+    },
+    {
+      "seconds_per_completed_trial": 1,
+      "effective_parallelism": 8,
+      "hours": 2.8444444444444446
+    },
+    {
+      "seconds_per_completed_trial": 10,
+      "effective_parallelism": 4,
+      "hours": 56.888888888888886
+    },
+    {
+      "seconds_per_completed_trial": 10,
+      "effective_parallelism": 8,
+      "hours": 28.444444444444443
+    },
+    {
+      "seconds_per_completed_trial": 60,
+      "effective_parallelism": 4,
+      "hours": 341.3333333333333
+    },
+    {
+      "seconds_per_completed_trial": 60,
+      "effective_parallelism": 8,
+      "hours": 170.66666666666666
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1784469313" />
+    <testcase name="test" classname="fp_ieee_partition_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/basic_components/fp_operation/test/fp_ieee_partition_tb.py" lineno="77" time="0.03256654739379883" sim_time_ns="1105.001" ratio_time="33930.55415540946" />
+  </testsuite>
+</testsuites>

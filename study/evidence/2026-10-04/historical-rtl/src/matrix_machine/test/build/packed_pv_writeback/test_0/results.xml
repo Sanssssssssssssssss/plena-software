@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1786479765" />
+    <testcase name="consecutive_overwrite_and_accumulate_rows_preserve_context" classname="packed_pv_writeback_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/matrix_machine/test/packed_pv_writeback_tb.py" lineno="115" time="0.007863998413085938" sim_time_ns="310.001" ratio_time="39420.27753771525" />
+  </testsuite>
+</testsuites>

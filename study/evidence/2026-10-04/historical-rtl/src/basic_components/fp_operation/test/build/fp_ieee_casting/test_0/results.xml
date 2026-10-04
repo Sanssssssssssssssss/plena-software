@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1784469337" />
+    <testcase name="test" classname="fp_ieee_casting_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/basic_components/fp_operation/test/fp_ieee_casting_tb.py" lineno="76" time="0.011919260025024414" sim_time_ns="6.001" ratio_time="503.47085199927994" />
+  </testsuite>
+</testsuites>

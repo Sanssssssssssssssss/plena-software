@@ -1,0 +1,8 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1786475899" />
+    <testcase name="test" classname="SimTop_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/system/test/SimTop_tb.py" lineno="708" time="0.6451523303985596" sim_time_ns="10040.001" ratio_time="15562.217676246368">
+      <failure message="Test failed with RANDOM_SEED=1786475899" />
+    </testcase>
+  </testsuite>
+</testsuites>

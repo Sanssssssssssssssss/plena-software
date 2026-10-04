@@ -1,0 +1,9 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1786053945" />
+    <testcase name="shift_operands_use_gp_rs2_and_preserve_rd_writeback" classname="decoder_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/frontend/test/decoder_tb.py" lineno="131" time="0.002954244613647461" sim_time_ns="20.001" ratio_time="6770.258599305948" />
+    <testcase name="rtl_v6_row_and_packed_pv_fields_decode" classname="decoder_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/frontend/test/decoder_tb.py" lineno="160" time="0.0020711421966552734" sim_time_ns="24.001" ratio_time="11588.29173523656" />
+    <testcase name="instruction_preservation_during_stall" classname="decoder_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/frontend/test/decoder_tb.py" lineno="207" time="0.016289949417114258" sim_time_ns="256.001" ratio_time="15715.27286211489" />
+    <testcase name="stall_at_exact_transition" classname="decoder_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/frontend/test/decoder_tb.py" lineno="355" time="0.009351730346679688" sim_time_ns="156.00100000000003" ratio_time="16681.51178625332" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,20 @@
+{
+  "captured": "2026-10-04T18:22:11.2481482+08:00",
+  "cpu": {
+    "Name": "Intel(R) Core(TM) Ultra 9 185H",
+    "NumberOfCores": 16,
+    "NumberOfLogicalProcessors": 22
+  },
+  "physical_ram_bytes": 33736093696,
+  "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU, 8188 MiB, 566.36",
+  "disks": [
+    {
+      "Name": "C",
+      "Free": 93007151104
+    },
+    {
+      "Name": "E",
+      "Free": 146819514368
+    }
+  ]
+}

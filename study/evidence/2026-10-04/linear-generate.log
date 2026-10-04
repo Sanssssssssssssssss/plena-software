@@ -1,0 +1,34 @@
+${WORKSPACE}\PLENA\PLENA_RTL\tools\cfl_cocotb\runner.py:12: UserWarning: Python runners and associated APIs are an experimental feature and subject to change.
+  from cocotb.runner import get_runner, get_results
+Generating linear workload using projection_asm template:
+  Shape: (4, 16) @ (16, 32)
+  Build dir: ${WORKSPACE}\study\runs\linear
+
+Generated files:
+  hbm: ${WORKSPACE}\study\runs\linear\hbm.mem
+  fp_sram: ${WORKSPACE}\study\runs\linear\fp_sram.mem
+  int_sram: ${WORKSPACE}\study\runs\linear\int_sram.mem
+  vector_result: ${WORKSPACE}\study\runs\linear\vector_result.mem
+  tensors/act_tensor: ${WORKSPACE}\study\runs\linear\act_tensor.pt
+  tensors/weights: ${WORKSPACE}\study\runs\linear\weights.pt
+  act_txt: ${WORKSPACE}\study\runs\linear\act_tensor.txt
+  asm: ${WORKSPACE}\study\runs\linear\generated_asm_code.asm
+  machine_code: ${WORKSPACE}\study\runs\linear\generated_machine_code.mem
+  golden/pt: ${WORKSPACE}\study\runs\linear\golden_result.pt
+  golden/txt: ${WORKSPACE}\study\runs\linear\golden_result.txt
+  golden_vram/pt: ${WORKSPACE}\study\runs\linear\golden_vram_result.pt
+  golden_vram/txt: ${WORKSPACE}\study\runs\linear\golden_vram_result.txt
+  verification_params: ${WORKSPACE}\study\runs\linear\verification_params.json
+  test_params: ${WORKSPACE}\study\runs\linear\test_params.json
+
+Configuration:
+  workload_type: linear
+  batch_size: 4
+  in_features: 16
+  out_features: 32
+  mlen: 8
+  blen: 4
+  quant_config: {'exp_width': 8, 'man_width': 8, 'exp_bias_width': 8, 'block_size': [1, 8], 'int_width': 32, 'skip_first_dim': False, 'format': 'mxint'}
+  seed: 42
+  mx_format: None
+  use_aten_compiler: False

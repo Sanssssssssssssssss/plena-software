@@ -1,0 +1,4 @@
+rtl-v5 dynamic instructions: 14966 compile seconds: 0.467
+rtl-v6-R1 dynamic instructions: 14518 compile seconds: 0.467
+rtl-v6-R4 dynamic instructions: 13510 compile seconds: 0.435
+Matrix work invariant PASS; ${WORKSPACE}\study\logs\tiny-trace-ab.json

@@ -1,0 +1,6 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1784469431" />
+    <testcase name="test" classname="fp_mult_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/basic_components/fp_operation/test/fp_mult_tb.py" lineno="117" time="0.021764516830444336" sim_time_ns="115.001" ratio_time="5283.8756263652" />
+  </testsuite>
+</testsuites>

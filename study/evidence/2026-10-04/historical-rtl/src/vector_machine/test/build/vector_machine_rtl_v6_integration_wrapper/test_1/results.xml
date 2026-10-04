@@ -1,0 +1,8 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1786480053" />
+    <testcase name="production_vector_machine_preserves_normal_vector_path" classname="vector_machine_rtl_v6_integration_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/vector_machine/test/vector_machine_rtl_v6_integration_tb.py" lineno="142" time="0.09384346008300781" sim_time_ns="201.001" ratio_time="2141.875414889941" />
+    <testcase name="production_vector_machine_and_banked_sram_execute_tail_row_group" classname="vector_machine_rtl_v6_integration_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/vector_machine/test/vector_machine_rtl_v6_integration_tb.py" lineno="174" time="0.16561293601989746" sim_time_ns="421.001" ratio_time="2542.07799292574" />
+    <testcase name="production_reduction_path_accepts_independent_groups_at_ii_one" classname="vector_machine_rtl_v6_integration_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/vector_machine/test/vector_machine_rtl_v6_integration_tb.py" lineno="235" time="0.09158468246459961" sim_time_ns="231.0010000000001" ratio_time="2522.2667566630403" />
+  </testsuite>
+</testsuites>

@@ -1,0 +1,8 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1784469220" />
+    <testcase name="test" classname="fp_cp_asym_mult_tb" file="${UPSTREAM_WORKSPACE}/PLENA_RTL/src/basic_components/fp_operation/test/fp_cp_asym_mult_tb.py" lineno="122" time="0.0004961490631103516" sim_time_ns="0.001" ratio_time="2.015523306102835">
+      <failure message="Test failed with RANDOM_SEED=1784469220" />
+    </testcase>
+  </testsuite>
+</testsuites>

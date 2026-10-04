@@ -1,0 +1,44 @@
+{
+    "int_sram": {
+        "weight_offset" : { "content" : "hidden_size * (hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))", "addr" : "0" },
+        "bias_offset"   : { "content" : "(hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))", "addr" : "1" }
+    },
+
+    "fp_sram": {
+        "infinity" : { "content": "", "addr": "0" },
+        "eps"      : { "content": "", "addr": "1" },
+        "hid_reciprocal" : { "content": "", "addr": "2" },
+        "silu_one" : { "content": "1.0", "addr": "3" },
+        "gelu_1702" : { "content": "1.702", "addr": "4" },
+        "attn_scale" : { "content": "1/sqrt(head_dim)", "addr": "5" }
+    },
+
+    "vector_sram_addr": {
+        "block1" : "batch_size * hidden_size",
+        "block2" : "hidden_size",
+        "block3" : "batch_size * hidden_size",
+        "block4" : "batch_size * hidden_size",
+        "block5" : "batch_size * intermediate_size",
+        "k_split_scratch" : "batch_size * hidden_size + batch_size * intermediate_size",
+        "q_scratch" : "batch_size * hidden_size + batch_size * intermediate_size + batch_size * hidden_size",
+        "k_scratch" : "batch_size * hidden_size + batch_size * intermediate_size + 2 * batch_size * hidden_size",
+        "v_scratch" : "batch_size * hidden_size + batch_size * intermediate_size + 3 * batch_size * hidden_size",
+        "attn_out_scratch" : "batch_size * hidden_size + batch_size * intermediate_size + 4 * batch_size * hidden_size"
+    },
+
+    "hbm_addr": {
+        "weight_q": "0",
+        "weight_k"  : "hidden_size * (hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))",
+        "weight_v"  : "hidden_size * (hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))",
+        "weight_o"  : "hidden_size * (hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))",
+        "bias_q"    : "(hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))",
+        "bias_k"    : "(hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))",
+        "bias_v"    : "(hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))",
+        "bias_o"    : "(hidden_size // block_dim) * ((wt_block_width // 8) + (scale_width // 8))",
+        "k_cache"   : "context_length * ((num_key_value_heads * head_dim) // block_dim) * ((kv_block_width // 8) + (scale_width // 8))",
+        "v_cache"   : "context_length * ((num_key_value_heads * head_dim) // block_dim) * ((kv_block_width // 8) + (scale_width // 8))",
+        "token_table" : "context_length * (hidden_size // block_dim) * ((act_block_width // 8) + (scale_width // 8))",
+        "rope_params" : "2 * (head_dim // block_dim) * ((act_block_width // 8) + (scale_width // 8))",
+        "scratchpad": ""
+    }
+}

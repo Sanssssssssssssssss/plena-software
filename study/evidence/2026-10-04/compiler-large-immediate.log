@@ -1,0 +1,57 @@
+test_large_ffn_2048_8192_gate_result_absolute (__main__.TestFfnAsmLargeMatrix.test_large_ffn_2048_8192_gate_result_absolute)
+gate_result address must be computed as absolute, not relative with large offset. ... ok
+test_large_ffn_2048_8192_no_assertion_error (__main__.TestFfnAsmLargeMatrix.test_large_ffn_2048_8192_no_assertion_error)
+hidden=2048, intermediate=8192 (SmolVLM2 FFN scale) should not raise. ... ok
+test_large_ffn_hidden128_inter256_no_assertion_error (__main__.TestFfnAsmLargeMatrix.test_large_ffn_hidden128_inter256_no_assertion_error)
+hidden=128, intermediate=256 (smollm2 test scale) should not raise. ... ok
+test_loop_path_large_2048_8192_no_assertion_error (__main__.TestFfnAsmLargeMatrix.test_loop_path_large_2048_8192_no_assertion_error)
+use_loop_instructions=True (production path) must handle large matrices. ... ok
+test_loop_path_smollm2_scale (__main__.TestFfnAsmLargeMatrix.test_loop_path_smollm2_scale)
+Production path with smollm2 scale (hidden=128, inter=256) all immediates bounded. ... ok
+test_small_ffn_all_addi_bounded (__main__.TestFfnAsmLargeMatrix.test_small_ffn_all_addi_bounded)
+Even for small FFN, all S_ADDI_INT immediates must fit in 18 bits. ... ok
+test_small_ffn_no_error (__main__.TestFfnAsmLargeMatrix.test_small_ffn_no_error)
+hidden=64, intermediate=128 (current test scale) works fine. ... ok
+test_workspace_base_offsets_loop_path (__main__.TestFfnAsmLargeMatrix.test_workspace_base_offsets_loop_path)
+Production loop path must place FFN temps at the explicit workspace base. ... ok
+test_2048x2048 (__main__.TestLoadLargeInt.test_2048x2048)
+2048*2048 = 4194304: upper=1024, lower=0 -> LUI only. ... ok
+test_2048x8192 (__main__.TestLoadLargeInt.test_2048x8192)
+2048*8192 = 16777216: upper=4096, lower=0 -> LUI only. ... ok
+test_64x64_small (__main__.TestLoadLargeInt.test_64x64_small)
+64*64 = 4096 < 2^18: fits in 18-bit immediate -> single S_ADDI_INT from gp0. ... ok
+test_boundary_value_2_18 (__main__.TestLoadLargeInt.test_boundary_value_2_18)
+Value = 2^18 = 262144 needs LUI (upper=64, lower=0). ... ok
+test_large_add_with_temp (__main__.TestLoadLargeInt.test_large_add_with_temp)
+Relative large adds can use caller-provided temp registers. ... ok
+test_large_add_without_temp_chunks (__main__.TestLoadLargeInt.test_large_add_without_temp_chunks)
+Compiler-wide fallback must not need a scratch register. ... ok
+test_small_value_below_2_18 (__main__.TestLoadLargeInt.test_small_value_below_2_18)
+128*256 = 32768 < 2^18: fits in 18-bit immediate -> single S_ADDI_INT from gp0. ... ok
+test_small_value_single_addi (__main__.TestLoadLargeInt.test_small_value_single_addi)
+Values < 4096 (upper=0) use a single S_ADDI_INT. ... ok
+test_value_with_remainder (__main__.TestLoadLargeInt.test_value_with_remainder)
+Value with non-zero lower 12 bits emits both LUI and ADDI. ... ok
+test_zero_value (__main__.TestLoadLargeInt.test_zero_value)
+Zero should emit S_ADDI_INT gp{reg}, gp0, 0. ... ok
+test_128x256_no_assertion_error (__main__.TestProjectionAsmLargeMatrix.test_128x256_no_assertion_error)
+128*256 = 32768 < 2^18: should not raise AssertionError. ... ok
+test_2048x2048_no_assertion_error (__main__.TestProjectionAsmLargeMatrix.test_2048x2048_no_assertion_error)
+2048x2048 should not raise AssertionError and must use LUI. ... ok
+test_2048x8192_no_assertion_error (__main__.TestProjectionAsmLargeMatrix.test_2048x8192_no_assertion_error)
+2048x8192 = 16777216 should not raise AssertionError and must use LUI. ... ok
+test_512x512_boundary (__main__.TestProjectionAsmLargeMatrix.test_512x512_boundary)
+512*512 = 262144 = 2^18: needs LUI (upper=64, lower=0). ... ok
+test_small_matrix_no_change (__main__.TestProjectionAsmLargeMatrix.test_small_matrix_no_change)
+64x64 should still work and contain expected instructions. ... ok
+test_small_matrix_no_lui (__main__.TestProjectionAsmLargeMatrix.test_small_matrix_no_lui)
+64x64 = 4096 elements < 2^18: single S_ADDI_INT from gp0 (no LUI needed). ... ok
+test_2048x2048_no_assertion_error (__main__.TestProjectionTAsmLargeMatrix.test_2048x2048_no_assertion_error)
+2048x2048 projection_T_asm should not raise AssertionError. ... ok
+test_small_matrix (__main__.TestProjectionTAsmLargeMatrix.test_small_matrix)
+64x64 works without error. ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 99.124s
+
+OK
