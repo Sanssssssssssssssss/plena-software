@@ -24,6 +24,7 @@ def main():
         path = ROOT / row['path']
         assert row['path'] in files, f'Missing import in Git: {row["path"]}'
         data = path.read_bytes()
+        assert not data.startswith(b'version https://git-lfs.github.com/spec/v1'), f'LFS placeholder: {path}'
         assert digest(data) == row['sha256'], f'Changed import: {path}'
         if row.get('change', '').startswith('Chinese comments only'):
             clean = b''.join(line for line in data.splitlines(keepends=True) if '学习注：'.encode() not in line)
@@ -42,9 +43,9 @@ def main():
             assert path.exists(), f'Broken link: {doc.name} -> {target}'
             rel = path.relative_to(ROOT).as_posix()
             assert rel in files or any(f.startswith(rel + '/') for f in files), f'Untracked link target: {target}'
-    history = ROOT / 'evidence/history-2026-10-04'
-    for row in json.loads((history / 'manifest.json').read_text(encoding='utf-8'))['files']:
-        assert digest((history / row['file']).read_bytes()) == row['published_sha256'], row['file']
+    for evidence_manifest in ROOT.glob('evidence/*/manifest.json'):
+        for row in json.loads(evidence_manifest.read_text(encoding='utf-8'))['files']:
+            assert digest((evidence_manifest.parent / row['file']).read_bytes()) == row['published_sha256'], row['file']
     print(f'PASS: {len(files)} Git files; {len(manifest["files"])} imported files; zero gitlinks; comment-only source edits; historical hashes; authored document links')
 
 

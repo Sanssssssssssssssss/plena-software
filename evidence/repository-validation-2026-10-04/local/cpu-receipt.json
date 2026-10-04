@@ -1,0 +1,21 @@
+{
+  "scope": "CPU checks; no full-model accuracy or performance reproduction",
+  "jobs": {
+    "online-attention": {
+      "exit_code": 0,
+      "seconds": 4.101460200035945
+    },
+    "compiler-immediates": {
+      "exit_code": 0,
+      "seconds": 133.65296690003015
+    },
+    "research-checks": {
+      "exit_code": 0,
+      "seconds": 5.377785499906167
+    },
+    "tiny-trace-ab": {
+      "exit_code": 0,
+      "seconds": 4.7682217000983655
+    }
+  }
+}
