@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-04",
+  "tested_commit": "4933199",
+  "checkout": "new Git clone with public-source bootstrap",
+  "environment": "new Python 3.12.3 venv, include-system-site-packages=false, requirements.txt installed",
+  "checks": {
+    "source_pins": "7/7 matched; documented Tools substitute",
+    "cpu_smoke": "PASS",
+    "research_checks": "3 PASS",
+    "tiny_trace_ab": "PASS; arithmetic-count invariant",
+    "source_evidence_links_xml": "PASS; 781 regular files reviewed",
+    "rtl_wrapper": "2 PASS in existing WSL environment"
+  },
+  "scope": "Fresh Windows CPU environment verified; RTL wrapper rerun in existing WSL environment; full DSE/GPU claims remain unreplicated"
+}

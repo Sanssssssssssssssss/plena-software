@@ -246,6 +246,33 @@
       "kind": "imported-historical-rtl-result",
       "original_sha256": "f9c57ad10c2d3d99921b7da77960f92ed094f69b141e7bffc0254ca33b1add2d",
       "published_sha256": "4bd2d2196c8395a212e8bb8f045d36bdfe483ef6fb9b466db8a67db505044a83"
+    },
+    {
+      "source": ".cache/publish-check/study/logs/cpu-receipt.json",
+      "file": "fresh-cpu-receipt.json",
+      "kind": "fresh-clone-new-environment-run",
+      "original_sha256": "244e2b908c5dc8d6aaf9e4baec316d5e89de6c9fece6a9eceaae9907f0b33c25",
+      "published_sha256": "244e2b908c5dc8d6aaf9e4baec316d5e89de6c9fece6a9eceaae9907f0b33c25"
+    },
+    {
+      "source": ".cache/publish-check/study/logs/prefill-checks.log",
+      "file": "fresh-prefill-checks.log",
+      "kind": "fresh-clone-new-environment-run",
+      "original_sha256": "86fa707a942bf861ed7fe69df389e5b8d276beeb1b00443ebf03f3ba6ea14353",
+      "published_sha256": "86fa707a942bf861ed7fe69df389e5b8d276beeb1b00443ebf03f3ba6ea14353"
+    },
+    {
+      "source": ".cache/publish-check/study/logs/tiny-trace-ab.json",
+      "file": "fresh-tiny-trace-ab.json",
+      "kind": "fresh-clone-new-environment-run",
+      "original_sha256": "3ba07456609f3ef325230be8bd64f1e7ff0bd019193d5eb6660fe414dd8a6ad0",
+      "published_sha256": "3ba07456609f3ef325230be8bd64f1e7ff0bd019193d5eb6660fe414dd8a6ad0"
+    },
+    {
+      "source": "publication validation summary",
+      "file": "publication-check.json",
+      "kind": "validation-summary",
+      "published_sha256": "364c412824a90e4e52a94d4861119e32522b9c42a05e19ed29e1d396182b6dac"
     }
   ]
 }

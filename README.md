@@ -52,6 +52,8 @@ flowchart LR
 
 动态指令数改善还没有换算成延迟；模块通过也不等于 full-core 完整工作负载通过。
 
+发布前另用全新克隆和独立 Windows Python 环境复跑了 CPU/研究入口，并重新验证 RTL 启动脚本。见[克隆与运行验证记录](study/evidence/2026-10-04/publication-check.json)。
+
 **项目描述中的数字**
 
 | 数字 | 已核对到的范围 |
