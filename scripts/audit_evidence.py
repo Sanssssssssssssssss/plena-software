@@ -2,19 +2,12 @@
 from pathlib import Path
 import csv
 import json
-import subprocess
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 
 ROOT = Path(__file__).resolve().parents[1]
 PREFILL = ROOT / "PLENA_Simulator"
 LOG = ROOT / "runs"
-
-
-def git(path, *args):
-    if not (ROOT / path / ".git").exists():
-        return None
-    return subprocess.check_output(["git", "-C", str(ROOT / path), *args], text=True).strip()
 
 
 def main():
@@ -56,6 +49,7 @@ def main():
         "research_tools_status": "requested commit unavailable; substituted 0f103539, quant namespace alias used for focused checks",
         "archive_sha256": "979103A40F877590A4A8213F35DA4E3269CB889BF3E10E850BF5ED2B57026CC8",
         "expected_artifacts": {p: (PREFILL / p).exists() for p in missing},
+        "quantization_default_search_config_present": (ROOT / "PLENA_Software/prefill_DSE/search_space_qwen3.yaml").exists(),
         "historical_rtl_xml": history,
         "historical_rtl_xml_source": history_root.relative_to(ROOT).as_posix(),
         "historical_rtl_summary": {"files": len(history), "tests": sum(r["tests"] for r in history), "failures": sum(len(r["failures"]) for r in history)},

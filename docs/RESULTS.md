@@ -2,6 +2,8 @@
 
 **简历数字核对：有材料，但证据完整度不同**
 
+**版本口径**：下面的历史表与 CSV 均取自 Simulator `fddfcb9a` 保存的材料；这表示材料所在版本，不证明原实验也运行于这个 commit。当前量化代码 `d8c9bbcb` 不能自动认作历史 BFCL CSV 的生成版本；逐题原始 run 缺失处，执行 commit 标为未知。系统数字采用历史 **v3** schema，9 月系统模型已修订，本轮只重算表格。
+
 核对对象为[用户提供的项目描述](references/project-description.png)、公开研究分支和 RTL 压缩包。作者历史记录、保存的结果文件、本次本机运行分别标明；重新计算一个比例不会使它变成新的性能实测。
 
 | 描述中的结果 | 找到的证据与重算 | 当前判断 |
@@ -63,6 +65,8 @@ P 是 A100-equivalent 面积预算因子，每个预算单位 743.4 mm²；实�
 |---|---|---|
 | 32B | 224.66 → 236.55 | 0.066616 → 0.098245 |
 | 235B | 294.797 → 333.87 | 0.055952 → 0.093741 |
+
+两点均为历史 `W4/A4/KV4 + FP E6M5`、输入 90k、输出 8k、batch 8、MLEN/VLEN/BLEN=1024/1024/128。32B 为 P2:D6、16 个 NPU 芯片、DP4×TP4、R8；235B 为 P4:D12、16 个 NPU 芯片、DP2×TP2×EP4、R16 结构外推。历史点的准确率约束分别记录为 0.92/0.96，不能据此宣称两者都达到截图的 94%–96%。配置来源：[项目历史第 16 节](../PLENA_Simulator/Workspace/final_thesis_complete_project_history_20260818.md#16-当前-primary-90k8-system-results)。
 
 提升率统一为 `(new / baseline − 1) × 100%`。来源：[项目记录第 16 节](https://github.com/AICrossSim/PLENA_Simulator/blob/fddfcb9a7c3eaa1ad9f1c24da829a4422b324650/Workspace/final_thesis_complete_project_history_20260818.md#L1850)。表中数字已四舍五入，重算也受此精度限制。
 

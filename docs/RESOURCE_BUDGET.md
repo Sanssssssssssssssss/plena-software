@@ -23,11 +23,11 @@
 
 CPU 日志见[cpu-receipt.json](../evidence/history-2026-10-04/cpu-receipt.json)。[首次成功 RTL 日志](../evidence/history-2026-10-04/rtl-softmax-first-success.log)中用例本身分别约 0.061s / 0.005s，多数时间用于工具启动和生成、编译 C++；这些秒数不能当目标芯片执行时间。
 
-脚本会覆盖自己对应的 `study/logs` 与 `study/runs/linear`；保留一次实验时先复制到自己命名的目录。`run_cpu.py` 会在结束时还原生成器修改的 `configuration.svh`。不要同时启动多个会修改同一配置/同一 RTL build 的作业。
+初次整理的脚本输出曾位于 `study/logs` 与 `study/runs/linear`；当前两个仓库均使用自己的 `runs/`，硬件构建另在所属工程的 `build/`。硬件 `scripts/run_rtl.py` 在结束时还原生成器修改的 `configuration.svh`。保留实验时另存目录，不同时启动修改同一配置/构建目录的作业。
 
 **环境中需要知道的差异**
 
-1. 研究分支要求 `PLENA_Tools=a359963…`，远端与现有包中均未获得。当前替代为 `0f103539…`，`lab/python-aliases/quant` 仅兼容旧导入名称；通过 focused checks 不代表两个 Tools 版本数值等价。
+1. 研究分支要求 `PLENA_Tools=a359963…`，远端与现有包中均未获得。当前替代为 `0f103539…`，当前 `scripts/quant` 仅兼容旧导入名称；通过 focused checks 不代表两个 Tools 版本数值等价。
 2. 上游 editable 安装没有暴露旧 `quant` 包名，学习入口显式设置局部 PYTHONPATH。安装记录和依赖列表保存在[Windows requirements](../evidence/history-2026-10-04/requirements-windows.txt)与[WSL requirements](../evidence/history-2026-10-04/requirements-wsl.txt)。
 3. WSL 网络下载在本次失败，因此通过 Windows 下载 Linux wheels 后离线安装，缓存位于 `.cache/linux-wheels`。没有要求安装全局 CUDA 环境。
 4. Verilator wheel 的 make 配置遗漏 GCC PCH 的 `-include`，`run_rtl.sh` 用局部 MAKEFLAGS 补齐并限制 4 个编译任务。仿真报告识别 Verilator 5.34；这个工具构建并非原作者完整环境镜像。

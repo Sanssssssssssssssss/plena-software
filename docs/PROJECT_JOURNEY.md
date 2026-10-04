@@ -33,9 +33,9 @@ flowchart LR
 
 思考：若 RTL 数值不对，是数学错、舍入不同、地址错，还是写回布局错？必须有一个能逐项检查的小例子。
 
-行动：运行 `scripts/run_cpu.py`。当前小例子为 `(4,16) @ (16,32)`，固定种子；输出在`study/runs/linear/`（运行后生成）。顺着生成器读入参、quantize、golden、存储、汇编和机器码。这个入口采用模板编译路径，后续研究使用 ATen 风格的 schedule 路径，两者需要分别理解。
+行动：在硬件仓库运行 `bash scripts/run_rtl.sh baseline`。小例子为 `(4,16) @ (16,32)`，固定种子；输出在该仓库的 `reference/upstream-release/build/test/linear/`。顺着生成器读入参、quantize、golden、存储、汇编和机器码。这个入口采用模板编译路径，后续研究使用 ATen 风格的 schedule 路径，两者需要分别理解。
 
-应看到：158 条 32-bit 机器码及 golden。生成 golden 只证明 reference 路径可执行，RTL 正确性还需要仿真比较。当前本地没有把这个 Linear 跑到完整 core RTL 验收。
+应看到：158 条 32-bit 机器码及 golden，并继续查看 cocotb 和上游数值验证日志。本轮独立仓库的实际结果以硬件 README 的验收记录为准。初次整理仅完成了生成。
 
 练习：先预测把 N 翻倍会改变哪些权重/输出数据和循环次数，再另设输出目录运行。保持合法 tile 对齐；不通过时先核对 shape，不要直接删除 assert。
 
@@ -90,7 +90,7 @@ l'=\alpha l+\sum p,\qquad O'=\alpha O+pV,\qquad y=O/l.
 
 思考收益递减：扩大 R 不会让 Matrix QK/PV、FFN、HBM 和全局控制同比加速；SRAM banking 还可能触发最小宏容量浪费。R4→R8 的收益与面积增量要一起看。R16 在研究里属于结构外推，RTL 实现域为 R1/2/4/8。顶层默认 `SOFTMAX_ROW_LANES=1`，需要显式配置才能得到四行行为。
 
-验收：读[测试里的断言](https://github.com/Sanssssssssssssssss/plena-hardware/blob/main/src/vector_machine/test/softmax_row_engine_tb.py)，再运行 `study/run_rtl.sh`。本次 R4、VLEN8、E5M6 的 2 项测试通过，包括 ACTIVE_ROWS=3 的尾行和独立组相邻周期发射。II=1 表示可每拍接收独立组；有依赖的同一行仍须等待。
+验收：读[测试里的断言](https://github.com/Sanssssssssssssssss/plena-hardware/blob/main/src/vector_machine/test/softmax_row_engine_tb.py)，在硬件仓库运行 `bash scripts/run_rtl.sh modules`。R4、VLEN8、E5M6 的测试包括 ACTIVE_ROWS=3 的尾行和独立组相邻周期发射。II=1 表示可每拍接收独立组；有依赖的同一行仍须等待。
 
 **阶段 5：把 Dense 扩展到 MoE，控制不规则性**
 
