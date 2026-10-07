@@ -1,40 +1,55 @@
-# PLENA Software
+# PLENA Software · Qwen3 Prefill
 
-面向长上下文 LLM Prefill 的编译、模拟、量化与系统设计空间搜索工程。输入 Qwen3 Dense/MoE 的形状、精度和硬件配置，输出计算/DMA 指令、成本 trace、延迟/面积/功耗估计及 Prefill–Decode 系统指标。
+**Llama → Qwen3-32B / 235B-A22B · 编译映射 · 量化与架构联合优化**
 
-本仓库完整收录 PLENA 的研究模拟器与 Qwen3 量化软件分支，核心依赖直接内嵌。配套硬件：[plena-hardware](https://github.com/Sanssssssssssssssss/plena-hardware)。上游来源、版本差异和本仓库改动见 [PROVENANCE](PROVENANCE.md)。
+将 [PLENA](https://github.com/AICrossSim/PLENA) 面向 Llama 的编译与评估流程扩展到 Qwen3-32B（Dense）和 Qwen3-235B-A22B（MoE）的长上下文 Prefill。适配显式 `head_dim`、GQA 布局与专家路由，生成计算/DMA 指令，并结合量化评测和成本模型搜索阵列、SRAM 与多芯片配置。
+
+本仓库保存 Compiler、Simulator、量化评测和 DSE 源码；四行 Online Softmax、状态驻留与 packed PV 的 RTL 在配套硬件仓库。
+
+[硬件工程](https://github.com/Sanssssssssssssssss/plena-hardware) · [核心源码索引](docs/READING.md) · [运行结果与日志](docs/VALIDATION.md) · [安装说明](docs/SETUP.md)
+
+## 项目结果
+
+以下采用项目最终报告口径，主要实验在另一台计算机完成；本机复测见下方独立章节。
+
+| 指标 | Qwen3-32B / Dense | Qwen3-235B-A22B / MoE |
+|---|---:|---:|
+| 同精度、同阵列下的单层模型加速 | **2.69×** | **3.22×** |
+| 稳态输出吞吐提升 | **5.3%** | **13.3%** |
+| 输出能效提升 | **46.8%** | **65.0%** |
+
+联合搜索约 **8.2 万组候选配置**；最终 **W4/A4/KV4** 配置取得 **94%–96% BFCL-Multiple** 准确率。系统评估采用 **90k 输入 / 8k 输出、batch 8**，在匹配硅面积与 HBM 预算下，与纯 A100 基线比较。
+
+单层收益来自模型评估；系统指标结合 NPU 性能模型与 A100/vLLM 测量。项目报告、归档表格及待同步日志的情况见 [RESULTS](docs/RESULTS.md)。
 
 ## 架构与源码
 
 ```mermaid
 flowchart LR
-  Q[模型配置 + 精度] --> C[Compiler: layout / tiling / GQA / MoE]
+  Q[模型形状与精度] --> C[Compiler: layout / tiling / schedule]
   C --> I[汇编与机器码]
-  C --> T[CostTrace: opcode / DMA / EnergyAction]
-  I --> R[事务级模拟器 / 配套 RTL]
-  T --> M[延迟 + HBM + 面积 + 功耗模型]
-  B[quant_eval: 校准 + BFCL] --> A[精度约束]
-  M --> D[DSE: 阵列 / SRAM / 芯片 / 并行]
-  A --> D
-  D --> S[Prefill–Decode 系统评估]
-  G[历史 A100 测量输入] --> S
+  C --> T[CostTrace: 计算与访存]
+  I --> R[配套模拟器 / RTL]
+  T --> M[延迟 / 面积 / 能耗模型]
+  E[量化评估] --> A[精度约束]
+  A --> D[设计空间搜索]
+  M --> D
+  D --> S[Prefill-Decode 系统评估]
 ```
 
-| 目录 | 主要输入 → 输出 |
+| 核心目录 | 输入 → 输出 |
 |---|---|
-| [PLENA_Simulator/PLENA_Compiler](PLENA_Simulator/PLENA_Compiler) | 张量形状与硬件配置 → layout、schedule、汇编、CostTrace |
-| [PLENA_Simulator/PLENA_Tools](PLENA_Simulator/PLENA_Tools) | 精度/存储配置 → MX 数值工具、镜像、结果比较 |
-| [analytic_models](PLENA_Simulator/analytic_models) | 指令与访存工作量、校准系数 → 延迟、面积、能耗 |
-| [transactional_emulator](PLENA_Simulator/transactional_emulator) | 机器码与初始内存 → Rust 事务级执行及内存状态 |
-| [Workspace](PLENA_Simulator/Workspace) | 实验脚本、历史项目记录、已有校准与精度汇总 |
-| [PLENA_Software](PLENA_Software) | PyTorch Qwen3 Dense/MoE、量化配置 → 校准、BFCL 与 PPL 结果 |
-| [quant_eval](PLENA_Software/quant_eval) / [prefill_DSE](PLENA_Software/prefill_DSE) | 模型与精度候选 → 评估与可恢复的批量搜索；OSWorld 源码已内嵌 |
-| [官方文档](docs/upstream/PLENA_Doc) / [阅读索引](docs/READING.md) | 体系说明与实际代码入口 |
-| [scripts](scripts) / [evidence](evidence) | 本仓库运行入口 / 带来源的历史及当前收据 |
+| [Compiler](PLENA_Simulator/PLENA_Compiler) / [Tools](PLENA_Simulator/PLENA_Tools) | shape、精度、硬件配置 → 布局、调度、指令、数值与镜像工具 |
+| [analytic_models](PLENA_Simulator/analytic_models) | 指令与访存工作量、校准数据 → 延迟、面积、能耗估计 |
+| [transactional_emulator](PLENA_Simulator/transactional_emulator) | 机器码与初始内存 → 事务级执行与内存状态 |
+| [quant_eval](PLENA_Software/quant_eval) / [prefill_DSE](PLENA_Software/prefill_DSE) | Qwen3 Dense/MoE、精度候选 → 校准、BFCL/PPL 与批量搜索 |
+| [scripts](scripts) / [evidence](evidence) | 可复跑入口 → 日志、结果核对与证据 |
 
-## 安装与最小运行
+[OSWorld](PLENA_Software/quant_eval/benchmarks/OSWorld) 是**可选第三方桌面 Agent 评测组件**，由量化软件的 OSWorld 评测入口调用。CPU 检查无需运行它。[Workspace](PLENA_Simulator/Workspace) 与[官方文档](docs/upstream/PLENA_Doc)保留上游实验记录及参考说明。
 
-Python 3.12，CPU 即可。不下载模型权重。以下在仓库根目录执行：
+## CPU 最小运行
+
+Python 3.12，在仓库根目录执行：
 
 ```powershell
 git clone https://github.com/Sanssssssssssssssss/plena-software.git
@@ -45,31 +60,30 @@ uv pip install --python .venv/Scripts/python.exe -r requirements-cpu.txt --index
 .venv/Scripts/python.exe scripts/audit_evidence.py
 ```
 
-Linux 使用 `.venv/bin/python`。uv 的两个索引分别是 PyPI 与 PyTorch 官方 CPU 源；也可用 `python -m pip install -r requirements-cpu.txt`。运行入口自行定位仓库并设置组件导入路径。
+Linux 使用 `.venv/bin/python`。运行结果写入 `runs/`；检查失败返回非零。CPU 路径不需要模型权重。量化/GPU 环境与事务级模拟器构建见 [SETUP](docs/SETUP.md)。
 
-`run_cpu.py` 依次执行：5 种 tile 的 GQA online-attention 数学对照、完整立即数测试、研究前端/系统指标/跨阶段空闲能耗 3 项检查、小型 v5/R1/R4 编译 A/B。日志与 JSON 写入 `runs/`，失败返回非零。预期 tiny 动态指令为 **14,966 / 14,518 / 13,510**，同时检查矩阵算术次数一致；这不是周期加速比。
+## 本机复测
 
-[本轮验收及日志](docs/VALIDATION.md)记录实际结果。再次运行会更新自己的 `runs/` 文件，正式实验应另存带配置的结果目录。
-
-量化/GPU 环境与事务级模拟器的完整入口见 [SETUP](docs/SETUP.md)。本轮未重跑 GPU、完整 DSE 或 DC。部分作者原始配置/结果缺失，不能只执行默认命令就声称复现历史论文成绩。
-
-## 与硬件配套
-
-研究模拟器 `fddfcb9a` + Compiler `0ba3b657`；Tools 原 pin `a359963d` 缺失，采用 `0f103539` 和局部旧包名别名。量化分支 `d8c9bbcb`。具体版本、接口文件和未验证组合见 [配套表](docs/COMPATIBILITY.md)。跨仓库前先核对 ISA、精度和 tile 配置。
-
-## 四条项目主线
-
-| 主线 | 从哪里理解与复现 |
+| 路径 | 结果与条件 |
 |---|---|
-| 编译映射 | Qwen3 显式 head_dim → GQA/KV 布局 → tile/AGU/MoE 路由 → 指令与 DMA；[代码索引](docs/READING.md) |
-| RTL 优化 | m/l 状态驻留、R4 online softmax、packed PV 写回；在配套硬件仓库跑模块测试 |
-| 量化与联合搜索 | BFCL 精度约束 + 校准成本模型 + 阵列/SRAM/多芯片候选；[流程拆解](docs/PROJECT_JOURNEY.md) |
-| 系统评估 | Prefill/Decode 瓶颈、固定 batch 吞吐、SLO goodput、含等待静态能耗的 tokens/J |
+| 数学 reference | GQA online attention，5 种 tile 配置对照 |
+| 编译与研究检查 | 26 项编译器检查、3 项研究前端/系统指标检查通过 |
+| 小型编译 A/B | v5 / R1 / R4：**14,966 / 14,518 / 13,510** 条动态指令；矩阵算术计数一致 |
+| 本仓库新增 | 独立运行脚本、43 处核心源码注释、配套版本说明与结果核对 |
 
-[分阶段学习与瓶颈思路](docs/PROJECT_JOURNEY.md)按照“观察什么 → 怎么判断 → 改哪里 → 用什么验证”组织。[简历数字核对](docs/RESULTS.md)区分作者记录、保存的汇总和本机新测试。
+以上为 **2026-10-04 的本机验证结果**。A/B 指令数下降 9.73%；这组测试没有测量端到端延迟。[完整配置与日志](docs/VALIDATION.md) · [日志目录说明](evidence/README.md)。
 
-## 结果来源与限制
+## 从哪里读代码
 
-历史单层模型表可重算 Dense **2.6871×** / MoE **3.2192×**；81,920 为历史 COMPLETE trial 数，原始 trial 库缺失。235B W4/A4/KV4 部分 FP 设置有 **48/50=96%** 汇总，94% 下界尚待同配置证据。
+| 问题 | 工程入口 |
+|---|---|
+| 怎样把 GQA/MoE 映射为计算与 DMA？ | [GQA 调度](PLENA_Simulator/PLENA_Compiler/aten/plena/program_attention.py)、[MoE 路由](PLENA_Simulator/PLENA_Compiler/aten/moe.py)与[源码索引](docs/READING.md) |
+| 怎样比较优化，排除工作量变化？ | [小型 A/B 的配置和检查器](docs/VALIDATION.md) |
+| 精度、阵列、SRAM 与带宽如何相互制约？ | [项目阶段与瓶颈分析](docs/PROJECT_JOURNEY.md) |
+| 历史吞吐与能效数字如何计算？ | [研究结果核对](docs/RESULTS.md)与[资源预算](docs/RESOURCE_BUDGET.md) |
 
-历史系统 v3 表支持吞吐 **+5.292% / +13.254%**；同表重算能效为 **+47.480% / +67.538%**，未与截图的 46.8% / 65.0% 对齐。上述属于原作者模型/测量组合，不是本次硬件实测。完整条件、缺失证据和资源估算见 [RESULTS](docs/RESULTS.md) 与 [资源预算](docs/RESOURCE_BUDGET.md)。
+## 配套版本与来源
+
+研究路径：Simulator `fddfcb9a`、Compiler `0ba3b657`、量化分支 `d8c9bbcb`。Tools 原 pin 缺失，使用 `0f103539` 及兼容别名。跨仓库运行前核对 ISA、精度和 tile，见[版本配套表](docs/COMPATIBILITY.md)。
+
+PLENA 基础框架及第三方组件保留原有版权声明。仓库整理另补充中文注释、运行脚本和结果核对。[来源与改动](PROVENANCE.md)记录导入版本、逐文件哈希及适用许可证。GPU、完整 DSE、DC 综合和 Rust 事务级执行未包含在上述本机验证中。
